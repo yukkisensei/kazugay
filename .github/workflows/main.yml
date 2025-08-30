@@ -1,104 +1,96 @@
 name: RDP
+
 on:
   workflow_dispatch:
+
 jobs:
   secure-rdp:
     runs-on: windows-latest
     timeout-minutes: 3600
+
     steps:
       - name: Configure Core RDP Settings
         run: |
-          # Enable Remote Desktop and disable Network Level Authentication (if needed)
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' `
                              -Name "fDenyTSConnections" -Value 0 -Force
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' `
                              -Name "UserAuthentication" -Value 0 -Force
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' `
                              -Name "SecurityLayer" -Value 0 -Force
-          # Remove any existing rule with the same name to avoid duplication
-          netsh advfirewall firewall delete rule name="RDP-Tailscale"
-         
-          # For testing, allow any incoming connection on port 3389
-          netsh advfirewall firewall add rule name="RDP-Tailscale" `
+
+          netsh advfirewall firewall delete rule name="RDP-Public"
+          netsh advfirewall firewall add rule name="RDP-Public" `
             dir=in action=allow protocol=TCP localport=3389
-          # (Optional) Restart the Remote Desktop service to ensure changes take effect
+
           Restart-Service -Name TermService -Force
-      - name: Create RDP User with Secure Password
+
+      - name: Set Computer Name
         run: |
-          Add-Type -AssemblyName System.Security
-          $charSet = @{
-              Upper   = [char[]](65..90)      # A-Z
-              Lower   = [char[]](97..122)     # a-z
-              Number  = [char[]](48..57)      # 0-9
-              Special = ([char[]](33..47) + [char[]](58..64) +
-                         [char[]](91..96) + [char[]](123..126)) # Special characters
-          }
-          $rawPassword = @()
-          $rawPassword += $charSet.Upper | Get-Random -Count 4
-          $rawPassword += $charSet.Lower | Get-Random -Count 4
-          $rawPassword += $charSet.Number | Get-Random -Count 4
-          $rawPassword += $charSet.Special | Get-Random -Count 4
-          $password = -join ($rawPassword | Sort-Object { Get-Random })
+          Rename-Computer -NewName "kazugay" -Force
+          # Yêu cầu khởi động lại
+          Write-Host "Máy tính sẽ khởi động lại sau để áp dụng tên mới..."
+          # Lưu ý: Bước này sẽ gây khởi động lại và có thể ảnh hưởng đến workflow
+
+      - name: Create RDP User with Fixed Password
+        run: |
+          $password = "yukki_washere"
           $securePass = ConvertTo-SecureString $password -AsPlainText -Force
           New-LocalUser -Name "RDP" -Password $securePass -AccountNeverExpires
           Add-LocalGroupMember -Group "Administrators" -Member "RDP"
           Add-LocalGroupMember -Group "Remote Desktop Users" -Member "RDP"
          
           echo "RDP_CREDS=User: RDP | Password: $password" >> $env:GITHUB_ENV
-         
-          if (-not (Get-LocalUser -Name "RDP")) {
-              Write-Error "User creation failed"
-              exit 1
-          }
-      - name: Install Tailscale
+
+      - name: Get Public IP Information
         run: |
-          $tsUrl = "https://pkgs.tailscale.com/stable/tailscale-setup-1.82.0-amd64.msi"
-          $installerPath = "$env:TEMP\tailscale.msi"
-         
-          Invoke-WebRequest -Uri $tsUrl -OutFile $installerPath
-          Start-Process msiexec.exe -ArgumentList "/i", "`"$installerPath`"", "/quiet", "/norestart" -Wait
-          Remove-Item $installerPath -Force
-      - name: Establish Tailscale Connection
+          # Cố gắng lấy public IP (nếu có)
+          $publicIP = (Invoke-RestMethod -Uri "https://api.ipify.org" -ErrorAction SilentlyContinue)
+          if ($publicIP) {
+            echo "PUBLIC_IP=$publicIP" >> $env:GITHUB_ENV
+          } else {
+            Write-Warning "Không thể lấy Public IP. Có thể runner không có public IP trực tiếp."
+          }
+
+      - name: Install Ngrok for Public Tunnel
         run: |
-          # Bring up Tailscale with the provided auth key and set a unique hostname
-          & "$env:ProgramFiles\Tailscale\tailscale.exe" up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=gh-runner-$env:GITHUB_RUN_ID
-         
-          # Wait for Tailscale to assign an IP
-          $tsIP = $null
-          $retries = 0
-          while (-not $tsIP -and $retries -lt 10) {
-              $tsIP = & "$env:ProgramFiles\Tailscale\tailscale.exe" ip -4
-              Start-Sleep -Seconds 5
-              $retries++
-          }
-         
-          if (-not $tsIP) {
-              Write-Error "Tailscale IP not assigned. Exiting."
-              exit 1
-          }
-          echo "TAILSCALE_IP=$tsIP" >> $env:GITHUB_ENV
-     
-      - name: Verify RDP Accessibility
+          # Tải và cài đặt Ngrok để tạo tunnel public
+          $ngrokUrl = "https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip"
+          $ngrokPath = "$env:TEMP\ngrok.zip"
+          Invoke-WebRequest -Uri $ngrokUrl -OutFile $ngrokPath
+          Expand-Archive -Path $ngrokPath -DestinationPath "C:\ngrok" -Force
+          $env:Path += ";C:\ngrok"
+
+      - name: Create Ngrok Tunnel
         run: |
-          Write-Host "Tailscale IP: $env:TAILSCALE_IP"
-         
-          # Test connectivity using Test-NetConnection against the Tailscale IP on port 3389
-          $testResult = Test-NetConnection -ComputerName $env:TAILSCALE_IP -Port 3389
-          if (-not $testResult.TcpTestSucceeded) {
-              Write-Error "TCP connection to RDP port 3389 failed"
-              exit 1
+          # Khởi chạy Ngrok tunnel cho cổng 3389
+          Start-Process -FilePath "C:\ngrok\ngrok.exe" -ArgumentList "tcp 3389" -WindowStyle Hidden
+          Start-Sleep -Seconds 10  # Chờ ngrok khởi động
+
+          # Lấy thông tin tunnel từ API ngrok
+          $tunnelInfo = (Invoke-RestMethod -Uri "http://localhost:4040/api/tunnels" -ErrorAction SilentlyContinue)
+          if ($tunnelInfo) {
+            $publicUrl = $tunnelInfo.tunnels[0].public_url
+            echo "NGROK_PUBLIC_URL=$publicUrl" >> $env:GITHUB_ENV
+          } else {
+            Write-Error "Không thể tạo Ngrok tunnel"
+            exit 1
           }
-          Write-Host "TCP connectivity successful!"
-      - name: Maintain Connection
+
+      - name: Display Connection Information
         run: |
           Write-Host "`n=== RDP ACCESS ==="
-          Write-Host "Address: $env:TAILSCALE_IP"
+          Write-Host "Computer Name: kazugay"
+          if ($env:PUBLIC_IP) {
+            Write-Host "Public IP: $env:PUBLIC_IP"
+          }
+          Write-Host "Ngrok Public URL: $env:NGROK_PUBLIC_URL"
           Write-Host "Username: RDP"
-          Write-Host "Password: $(echo $env:RDP_CREDS)"
+          Write-Host "Password: yukki_washere"
           Write-Host "==================`n"
-         
-          # Keep runner active indefinitely (or until manually cancelled)
+
+      - name: Maintain Connection
+        run: |
           while ($true) {
-              Write-Host "[$(Get-Date)] RDP Active - Use Ctrl+C in workflow to terminate"
-              Start-Sleep -Seconds 300
+            Write-Host "[$(Get-Date)] RDP Active - Use Ctrl+C in workflow to terminate"
+            Start-Sleep -Seconds 300
           }
