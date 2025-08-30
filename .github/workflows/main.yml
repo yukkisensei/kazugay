@@ -31,8 +31,7 @@ jobs:
               Upper   = [char[]](65..90)      # A-Z
               Lower   = [char[]](97..122)     # a-z
               Number  = [char[]](48..57)      # 0-9
-              Special = ([char[]](33..47) + [char[]](58..64) +
-                         [char[]](91..96) + [char[]](123..126)) # Special characters
+              Special = [char[]]('!@#$%^&*'.ToCharArray()) # Chỉ sử dụng các ký tự đặc biệt đơn giản
           }
           $rawPassword = @()
           $rawPassword += $charSet.Upper | Get-Random -Count 3
@@ -48,27 +47,40 @@ jobs:
          
           echo "RDP_CREDS=User: RDP | Password: $password" >> $env:GITHUB_ENV
 
-      - name: Setup Ngrok
-        uses: crazy-max/ghaction-setup-ngrok@v3
-        with:
-          authtoken: ${{ secrets.NGROK_AUTHTOKEN }}
-
-      - name: Create Ngrok Tunnel
+      - name: Download and Extract Ngrok
         run: |
-          # Khởi chạy Ngrok tunnel cho cổng 3389 trong background
-          Start-Process -FilePath "ngrok" -ArgumentList "tcp 3389" -WindowStyle Hidden
+          # Tải Ngrok phiên bản mới nhất
+          $ngrokUrl = "https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip"
+          $ngrokPath = "$env:TEMP\ngrok.zip"
+          Invoke-WebRequest -Uri $ngrokUrl -OutFile $ngrokPath
+          Expand-Archive -Path $ngrokPath -DestinationPath "$env:TEMP\ngrok" -Force
+
+      - name: Setup Ngrok Authentication
+        run: |
+          # Thiết lập authtoken cho Ngrok
+          & "$env:TEMP\ngrok\ngrok.exe" authtoken ${{ secrets.NGROK_AUTHTOKEN }}
+
+      - name: Start Ngrok Tunnel
+        run: |
+          # Khởi chạy Ngrok tunnel cho cổng 3389 và lấy URL trực tiếp
+          $ngrokProcess = Start-Process -FilePath "$env:TEMP\ngrok\ngrok.exe" `
+            -ArgumentList "tcp", "3389", "--log", "stdout" `
+            -RedirectStandardOutput "$env:TEMP\ngrok.log" `
+            -PassThru -WindowStyle Hidden
           
-          # Chờ tunnel được thiết lập
+          # Đợi một chút để tunnel được thiết lập
           Start-Sleep -Seconds 10
           
-          # Lấy thông tin tunnel
-          $tunnels = (Invoke-RestMethod -Uri "http://localhost:4040/api/tunnels").tunnels
-          if ($tunnels) {
-            $publicUrl = $tunnels[0].public_url
+          # Lấy URL từ log file
+          $ngrokLog = Get-Content "$env:TEMP\ngrok.log" -Tail 20
+          $publicUrl = ($ngrokLog | Select-String -Pattern "url=(tcp://.+.ngrok.io)") | ForEach-Object { $_.Matches.Groups[1].Value }
+          
+          if ($publicUrl) {
             echo "NGROK_PUBLIC_URL=$publicUrl" >> $env:GITHUB_ENV
-            Write-Host "Public URL: $publicUrl"
+            Write-Host "Ngrok Public URL: $publicUrl"
           } else {
-            Write-Error "Không thể tạo Ngrok tunnel"
+            Write-Error "Không thể lấy URL từ Ngrok"
+            Get-Content "$env:TEMP\ngrok.log" | Write-Host
             exit 1
           }
 
@@ -77,12 +89,18 @@ jobs:
           Write-Host "`n=== RDP ACCESS ==="
           Write-Host "Ngrok Public URL: $env:NGROK_PUBLIC_URL"
           Write-Host "Username: RDP"
-          Write-Host "Password: $(echo $env:RDP_CREDS | split '|' -Last)"
+          Write-Host "Password: $(echo $env:RDP_CREDS | ForEach-Object { $_.Split('|')[-1].Trim() })"
           Write-Host "==================`n"
+          Write-Host "Lưu ý: Bạn cần cài đặt Ngrok trên máy của mình và sử dụng lệnh sau để kết nối:"
+          Write-Host "ngrok tcp --region=us --remote-addr=$env:NGROK_PUBLIC_URL"
 
       - name: Maintain Connection
         run: |
+          # Hiển thị thông tin kết nối mỗi 5 phút
           while ($true) {
-            Write-Host "[$(Get-Date)] RDP Active - Use Ctrl+C in workflow to terminate"
+            Write-Host "[$(Get-Date)] RDP Active - Sử dụng Ctrl+C trong workflow để kết thúc"
+            Write-Host "URL: $env:NGROK_PUBLIC_URL"
+            Write-Host "User: RDP"
+            Write-Host "Password: $(echo $env:RDP_CREDS | ForEach-Object { $_.Split('|')[-1].Trim() })"
             Start-Sleep -Seconds 300
           }
