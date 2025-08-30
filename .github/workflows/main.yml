@@ -11,7 +11,6 @@ jobs:
     steps:
       - name: Configure Core RDP Settings
         run: |
-          # Enable RDP and configure settings
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' `
                              -Name "fDenyTSConnections" -Value 0 -Force
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' `
@@ -19,44 +18,23 @@ jobs:
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' `
                              -Name "SecurityLayer" -Value 0 -Force
 
-          # Configure firewall to allow RDP
-          netsh advfirewall firewall delete rule name="RDP-Public" 2>&1 | Out-Null
-          netsh advfirewall firewall add rule name="RDP-Public" `
+          netsh advfirewall firewall delete rule name="RDP-Tailscale" 2>&1 | Out-Null
+          netsh advfirewall firewall add rule name="RDP-Tailscale" `
             dir=in action=allow protocol=TCP localport=3389
 
-          # Try multiple methods to restart the Terminal Service
           try {
-            # Method 1: Standard restart
             Restart-Service -Name TermService -Force -ErrorAction Stop
-            Write-Host "TermService restarted successfully"
           } catch {
-            Write-Warning "First restart attempt failed: $($_.Exception.Message)"
-            try {
-              # Method 2: Stop and start separately
-              Stop-Service -Name TermService -Force -ErrorAction Stop
-              Start-Service -Name TermService -ErrorAction Stop
-              Write-Host "TermService restarted using stop/start method"
-            } catch {
-              Write-Warning "Second restart attempt failed: $($_.Exception.Message)"
-              try {
-                # Method 3: Use sc.exe command
-                sc.exe stop TermService 2>&1 | Out-Null
-                sc.exe start TermService 2>&1 | Out-Null
-                Write-Host "TermService restarted using sc.exe"
-              } catch {
-                Write-Warning "All restart attempts failed, but continuing anyway"
-              }
-            }
+            Write-Warning "Service restart failed but continuing: $($_.Exception.Message)"
           }
 
       - name: Create RDP User with Secure Password
         run: |
-          # Tạo mật khẩu ngẫu nhiên đáp ứng yêu cầu bảo mật của Windows
           $charSet = @{
-              Upper   = [char[]](65..90)      # A-Z
-              Lower   = [char[]](97..122)     # a-z
-              Number  = [char[]](48..57)      # 0-9
-              Special = [char[]]('!@#$%^&*'.ToCharArray()) # Chỉ sử dụng các ký tự đặc biệt đơn giản
+              Upper   = [char[]](65..90)
+              Lower   = [char[]](97..122)
+              Number  = [char[]](48..57)
+              Special = [char[]]('!@#$%^&*'.ToCharArray())
           }
           $rawPassword = @()
           $rawPassword += $charSet.Upper | Get-Random -Count 3
@@ -72,75 +50,49 @@ jobs:
          
           echo "RDP_CREDS=User: RDP | Password: $password" >> $env:GITHUB_ENV
 
-      - name: Download and Extract Ngrok
+      - name: Install Tailscale
         run: |
-          # Tải Ngrok phiên bản mới nhất
-          $ngrokUrl = "https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip"
-          $ngrokPath = "$env:TEMP\ngrok.zip"
-          Invoke-WebRequest -Uri $ngrokUrl -OutFile $ngrokPath
-          Expand-Archive -Path $ngrokPath -DestinationPath "$env:TEMP\ngrok" -Force
+          $tsUrl = "https://pkgs.tailscale.com/stable/tailscale-setup-latest-amd64.msi"
+          $installerPath = "$env:TEMP\tailscale.msi"
+          Invoke-WebRequest -Uri $tsUrl -OutFile $installerPath
+          Start-Process msiexec.exe -ArgumentList "/i", "`"$installerPath`"", "/quiet", "/norestart" -Wait
+          Remove-Item $installerPath -Force
 
-      - name: Setup Ngrok Authentication
+      - name: Establish Tailscale Connection
         run: |
-          # Thiết lập authtoken cho Ngrok
-          & "$env:TEMP\ngrok\ngrok.exe" authtoken ${{ secrets.NGROK_AUTHTOKEN }}
-
-      - name: Start Ngrok Tunnel
-        run: |
-          # Khởi chạy Ngrok tunnel cho cổng 3389 và lấy URL trực tiếp
-          $ngrokProcess = Start-Process -FilePath "$env:TEMP\ngrok\ngrok.exe" `
-            -ArgumentList "tcp", "3389", "--log", "stdout" `
-            -RedirectStandardOutput "$env:TEMP\ngrok.log" `
-            -PassThru -WindowStyle Hidden
+          & "$env:ProgramFiles\Tailscale\tailscale.exe" up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=gh-runner-$env:GITHUB_RUN_ID
           
-          # Đợi một chút để tunnel được thiết lập
-          Start-Sleep -Seconds 15
-          
-          # Lấy URL từ log file
-          $ngrokLog = Get-Content "$env:TEMP\ngrok.log" -Tail 50
-          Write-Host "Ngrok Log:"
-          $ngrokLog | Write-Host
-          
-          $publicUrl = ($ngrokLog | Select-String -Pattern "url=(tcp://.+.ngrok.io)") | ForEach-Object { $_.Matches.Groups[1].Value }
-          
-          if (-not $publicUrl) {
-            # Thử phương pháp khác để lấy URL
-            $publicUrl = ($ngrokLog | Select-String -Pattern "started tunnel.*url=(.+.ngrok.io)") | ForEach-Object { "tcp://" + $_.Matches.Groups[1].Value }
+          $tsIP = $null
+          $retries = 0
+          while (-not $tsIP -and $retries -lt 10) {
+              $tsIP = & "$env:ProgramFiles\Tailscale\tailscale.exe" ip -4
+              Start-Sleep -Seconds 5
+              $retries++
           }
           
-          if ($publicUrl) {
-            echo "NGROK_PUBLIC_URL=$publicUrl" >> $env:GITHUB_ENV
-            Write-Host "Ngrok Public URL: $publicUrl"
-          } else {
-            Write-Error "Không thể lấy URL từ Ngrok"
-            Write-Host "Trying alternative method..."
-            # Thử sử dụng API local
-            try {
-              $tunnelInfo = Invoke-RestMethod -Uri "http://localhost:4040/api/tunnels" -ErrorAction Stop
-              $publicUrl = $tunnelInfo.tunnels[0].public_url
-              echo "NGROK_PUBLIC_URL=$publicUrl" >> $env:GITHUB_ENV
-              Write-Host "Ngrok Public URL (via API): $publicUrl"
-            } catch {
-              Write-Error "Failed to get URL from API: $($_.Exception.Message)"
+          if (-not $tsIP) {
+              Write-Error "Tailscale IP not assigned. Exiting."
               exit 1
-            }
           }
+          echo "TAILSCALE_IP=$tsIP" >> $env:GITHUB_ENV
 
       - name: Display Connection Information
         run: |
           Write-Host "`n=== RDP ACCESS ==="
-          Write-Host "Ngrok Public URL: $env:NGROK_PUBLIC_URL"
+          Write-Host "Tailscale IP: $env:TAILSCALE_IP"
           Write-Host "Username: RDP"
           Write-Host "Password: $(echo $env:RDP_CREDS | ForEach-Object { $_.Split('|')[-1].Trim() })"
           Write-Host "==================`n"
-          Write-Host "Để kết nối, sử dụng thông tin trên với phần mềm RDP client"
+          Write-Host "Để kết nối:"
+          Write-Host "1. Cài đặt Tailscale trên máy của bạn"
+          Write-Host "2. Đăng nhập cùng tài khoản với Auth Key đã dùng"
+          Write-Host "3. Kết nối RDP đến địa chỉ IP trên"
 
       - name: Maintain Connection
         run: |
-          # Hiển thị thông tin kết nối mỗi 5 phút
           while ($true) {
             Write-Host "[$(Get-Date)] RDP Active - Sử dụng Ctrl+C trong workflow để kết thúc"
-            Write-Host "URL: $env:NGROK_PUBLIC_URL"
+            Write-Host "IP: $env:TAILSCALE_IP"
             Write-Host "User: RDP"
             Write-Host "Password: $(echo $env:RDP_CREDS | ForEach-Object { $_.Split('|')[-1].Trim() })"
             Start-Sleep -Seconds 300
