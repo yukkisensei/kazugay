@@ -1,4 +1,4 @@
-name: Kazugay
+name: RDP
 
 on:
   workflow_dispatch:
@@ -44,11 +44,12 @@ jobs:
           $password = -join ($rawPassword | Sort-Object { Get-Random })
           $securePass = ConvertTo-SecureString $password -AsPlainText -Force
           
-          New-LocalUser -Name "RDP" -Password $securePass -AccountNeverExpires
-          Add-LocalGroupMember -Group "Administrators" -Member "RDP"
-          Add-LocalGroupMember -Group "Remote Desktop Users" -Member "RDP"
+          # Sử dụng username "kazugay" theo yêu cầu
+          New-LocalUser -Name "kazugay" -Password $securePass -AccountNeverExpires
+          Add-LocalGroupMember -Group "Administrators" -Member "kazugay"
+          Add-LocalGroupMember -Group "Remote Desktop Users" -Member "kazugay"
          
-          echo "RDP_CREDS=User: RDP | Password: $password" >> $env:GITHUB_ENV
+          echo "RDP_CREDS=User: kazugay | Password: $password" >> $env:GITHUB_ENV
 
       - name: Install Tailscale
         run: |
@@ -80,7 +81,7 @@ jobs:
         run: |
           Write-Host "`n=== RDP ACCESS ==="
           Write-Host "Tailscale IP: $env:TAILSCALE_IP"
-          Write-Host "Username: RDP"
+          Write-Host "Username: kazugay"
           Write-Host "Password: $(echo $env:RDP_CREDS | ForEach-Object { $_.Split('|')[-1].Trim() })"
           Write-Host "==================`n"
           Write-Host "Để kết nối:"
@@ -93,7 +94,7 @@ jobs:
           while ($true) {
             Write-Host "[$(Get-Date)] RDP Active - Sử dụng Ctrl+C trong workflow để kết thúc"
             Write-Host "IP: $env:TAILSCALE_IP"
-            Write-Host "User: RDP"
+            Write-Host "User: kazugay"
             Write-Host "Password: $(echo $env:RDP_CREDS | ForEach-Object { $_.Split('|')[-1].Trim() })"
             Start-Sleep -Seconds 300
           }
