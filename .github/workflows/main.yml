@@ -11,6 +11,7 @@ jobs:
     steps:
       - name: Configure Core RDP Settings
         run: |
+          # Enable RDP and configure settings
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' `
                              -Name "fDenyTSConnections" -Value 0 -Force
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' `
@@ -18,11 +19,35 @@ jobs:
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' `
                              -Name "SecurityLayer" -Value 0 -Force
 
-          netsh advfirewall firewall delete rule name="RDP-Public"
+          # Configure firewall to allow RDP
+          netsh advfirewall firewall delete rule name="RDP-Public" 2>&1 | Out-Null
           netsh advfirewall firewall add rule name="RDP-Public" `
             dir=in action=allow protocol=TCP localport=3389
 
-          Restart-Service -Name TermService -Force
+          # Try multiple methods to restart the Terminal Service
+          try {
+            # Method 1: Standard restart
+            Restart-Service -Name TermService -Force -ErrorAction Stop
+            Write-Host "TermService restarted successfully"
+          } catch {
+            Write-Warning "First restart attempt failed: $($_.Exception.Message)"
+            try {
+              # Method 2: Stop and start separately
+              Stop-Service -Name TermService -Force -ErrorAction Stop
+              Start-Service -Name TermService -ErrorAction Stop
+              Write-Host "TermService restarted using stop/start method"
+            } catch {
+              Write-Warning "Second restart attempt failed: $($_.Exception.Message)"
+              try {
+                # Method 3: Use sc.exe command
+                sc.exe stop TermService 2>&1 | Out-Null
+                sc.exe start TermService 2>&1 | Out-Null
+                Write-Host "TermService restarted using sc.exe"
+              } catch {
+                Write-Warning "All restart attempts failed, but continuing anyway"
+              }
+            }
+          }
 
       - name: Create RDP User with Secure Password
         run: |
@@ -69,19 +94,36 @@ jobs:
             -PassThru -WindowStyle Hidden
           
           # Đợi một chút để tunnel được thiết lập
-          Start-Sleep -Seconds 10
+          Start-Sleep -Seconds 15
           
           # Lấy URL từ log file
-          $ngrokLog = Get-Content "$env:TEMP\ngrok.log" -Tail 20
+          $ngrokLog = Get-Content "$env:TEMP\ngrok.log" -Tail 50
+          Write-Host "Ngrok Log:"
+          $ngrokLog | Write-Host
+          
           $publicUrl = ($ngrokLog | Select-String -Pattern "url=(tcp://.+.ngrok.io)") | ForEach-Object { $_.Matches.Groups[1].Value }
+          
+          if (-not $publicUrl) {
+            # Thử phương pháp khác để lấy URL
+            $publicUrl = ($ngrokLog | Select-String -Pattern "started tunnel.*url=(.+.ngrok.io)") | ForEach-Object { "tcp://" + $_.Matches.Groups[1].Value }
+          }
           
           if ($publicUrl) {
             echo "NGROK_PUBLIC_URL=$publicUrl" >> $env:GITHUB_ENV
             Write-Host "Ngrok Public URL: $publicUrl"
           } else {
             Write-Error "Không thể lấy URL từ Ngrok"
-            Get-Content "$env:TEMP\ngrok.log" | Write-Host
-            exit 1
+            Write-Host "Trying alternative method..."
+            # Thử sử dụng API local
+            try {
+              $tunnelInfo = Invoke-RestMethod -Uri "http://localhost:4040/api/tunnels" -ErrorAction Stop
+              $publicUrl = $tunnelInfo.tunnels[0].public_url
+              echo "NGROK_PUBLIC_URL=$publicUrl" >> $env:GITHUB_ENV
+              Write-Host "Ngrok Public URL (via API): $publicUrl"
+            } catch {
+              Write-Error "Failed to get URL from API: $($_.Exception.Message)"
+              exit 1
+            }
           }
 
       - name: Display Connection Information
@@ -91,8 +133,7 @@ jobs:
           Write-Host "Username: RDP"
           Write-Host "Password: $(echo $env:RDP_CREDS | ForEach-Object { $_.Split('|')[-1].Trim() })"
           Write-Host "==================`n"
-          Write-Host "Lưu ý: Bạn cần cài đặt Ngrok trên máy của mình và sử dụng lệnh sau để kết nối:"
-          Write-Host "ngrok tcp --region=us --remote-addr=$env:NGROK_PUBLIC_URL"
+          Write-Host "Để kết nối, sử dụng thông tin trên với phần mềm RDP client"
 
       - name: Maintain Connection
         run: |
