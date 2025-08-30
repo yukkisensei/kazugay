@@ -48,61 +48,28 @@ jobs:
          
           echo "RDP_CREDS=User: RDP | Password: $password" >> $env:GITHUB_ENV
 
-      - name: Install Ngrok for Public Tunnel
-        run: |
-          $ngrokUrl = "https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip"
-          $ngrokPath = "$env:TEMP\ngrok.zip"
-          Invoke-WebRequest -Uri $ngrokUrl -OutFile $ngrokPath
-          Expand-Archive -Path $ngrokPath -DestinationPath "C:\ngrok" -Force
-          $env:Path += ";C:\ngrok"
-
-      - name: Configure Ngrok with Auth Token
-        run: |
-          C:\ngrok\ngrok.exe authtoken ${{ secrets.NGROK_AUTHTOKEN }}
+      - name: Setup Ngrok
+        uses: crazy-max/ghaction-setup-ngrok@v3
+        with:
+          authtoken: ${{ secrets.NGROK_AUTHTOKEN }}
 
       - name: Create Ngrok Tunnel
         run: |
-          # Đảm bảo không có tiến trình ngrok nào đang chạy
-          Get-Process -Name "ngrok" -ErrorAction SilentlyContinue | Stop-Process -Force
-          Start-Sleep -Seconds 2
-
-          # Khởi chạy Ngrok với log đầy đủ để debug
-          $ngrokProcess = Start-Process -FilePath "C:\ngrok\ngrok.exe" -ArgumentList "tcp 3389 --log=stdout" -WindowStyle Hidden -PassThru
+          # Khởi chạy Ngrok tunnel cho cổng 3389 trong background
+          Start-Process -FilePath "ngrok" -ArgumentList "tcp 3389" -WindowStyle Hidden
           
-          # Chờ lâu hơn và kiểm tra trạng thái
+          # Chờ tunnel được thiết lập
           Start-Sleep -Seconds 10
           
-          # Kiểm tra nếu tiến trình ngrok vẫn đang chạy
-          if (-not (Get-Process -Id $ngrokProcess.Id -ErrorAction SilentlyContinue)) {
-              Write-Error "Ngrok process failed to start"
-              exit 1
-          }
-
-          # Thử kết nối đến API với nhiều lần retry
-          $maxRetries = 10
-          $retryCount = 0
-          $tunnelInfo = $null
-          
-          while (-not $tunnelInfo -and $retryCount -lt $maxRetries) {
-              try {
-                  $tunnelInfo = Invoke-RestMethod -Uri "http://localhost:4040/api/tunnels" -ErrorAction Stop
-                  Write-Host "Successfully connected to Ngrok API"
-              } catch {
-                  Write-Host "Attempt $($retryCount + 1) failed: $($_.Exception.Message)"
-                  $retryCount++
-                  Start-Sleep -Seconds 5
-              }
-          }
-
-          if ($tunnelInfo -and $tunnelInfo.tunnels) {
-              $publicUrl = $tunnelInfo.tunnels[0].public_url
-              echo "NGROK_PUBLIC_URL=$publicUrl" >> $env:GITHUB_ENV
-              Write-Host "Public URL: $publicUrl"
+          # Lấy thông tin tunnel
+          $tunnels = (Invoke-RestMethod -Uri "http://localhost:4040/api/tunnels").tunnels
+          if ($tunnels) {
+            $publicUrl = $tunnels[0].public_url
+            echo "NGROK_PUBLIC_URL=$publicUrl" >> $env:GITHUB_ENV
+            Write-Host "Public URL: $publicUrl"
           } else {
-              Write-Error "Failed to create Ngrok tunnel after $maxRetries attempts"
-              # Hiển thị thông tin tiến trình để debug
-              Get-Process -Name "ngrok"
-              exit 1
+            Write-Error "Không thể tạo Ngrok tunnel"
+            exit 1
           }
 
       - name: Display Connection Information
