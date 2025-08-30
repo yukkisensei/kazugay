@@ -62,16 +62,47 @@ jobs:
 
       - name: Create Ngrok Tunnel
         run: |
-          Start-Process -FilePath "C:\ngrok\ngrok.exe" -ArgumentList "tcp 3389" -WindowStyle Hidden
-          Start-Sleep -Seconds 10
+          # Đảm bảo không có tiến trình ngrok nào đang chạy
+          Get-Process -Name "ngrok" -ErrorAction SilentlyContinue | Stop-Process -Force
+          Start-Sleep -Seconds 2
 
-          $tunnelInfo = (Invoke-RestMethod -Uri "http://localhost:4040/api/tunnels" -ErrorAction SilentlyContinue)
-          if ($tunnelInfo) {
-            $publicUrl = $tunnelInfo.tunnels[0].public_url
-            echo "NGROK_PUBLIC_URL=$publicUrl" >> $env:GITHUB_ENV
+          # Khởi chạy Ngrok với log đầy đủ để debug
+          $ngrokProcess = Start-Process -FilePath "C:\ngrok\ngrok.exe" -ArgumentList "tcp 3389 --log=stdout" -WindowStyle Hidden -PassThru
+          
+          # Chờ lâu hơn và kiểm tra trạng thái
+          Start-Sleep -Seconds 10
+          
+          # Kiểm tra nếu tiến trình ngrok vẫn đang chạy
+          if (-not (Get-Process -Id $ngrokProcess.Id -ErrorAction SilentlyContinue)) {
+              Write-Error "Ngrok process failed to start"
+              exit 1
+          }
+
+          # Thử kết nối đến API với nhiều lần retry
+          $maxRetries = 10
+          $retryCount = 0
+          $tunnelInfo = $null
+          
+          while (-not $tunnelInfo -and $retryCount -lt $maxRetries) {
+              try {
+                  $tunnelInfo = Invoke-RestMethod -Uri "http://localhost:4040/api/tunnels" -ErrorAction Stop
+                  Write-Host "Successfully connected to Ngrok API"
+              } catch {
+                  Write-Host "Attempt $($retryCount + 1) failed: $($_.Exception.Message)"
+                  $retryCount++
+                  Start-Sleep -Seconds 5
+              }
+          }
+
+          if ($tunnelInfo -and $tunnelInfo.tunnels) {
+              $publicUrl = $tunnelInfo.tunnels[0].public_url
+              echo "NGROK_PUBLIC_URL=$publicUrl" >> $env:GITHUB_ENV
+              Write-Host "Public URL: $publicUrl"
           } else {
-            Write-Error "Không thể tạo Ngrok tunnel"
-            exit 1
+              Write-Error "Failed to create Ngrok tunnel after $maxRetries attempts"
+              # Hiển thị thông tin tiến trình để debug
+              Get-Process -Name "ngrok"
+              exit 1
           }
 
       - name: Display Connection Information
