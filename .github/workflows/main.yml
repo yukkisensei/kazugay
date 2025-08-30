@@ -24,49 +24,36 @@ jobs:
 
           Restart-Service -Name TermService -Force
 
-      - name: Set Computer Name
+      - name: Create RDP User with Secure Password
         run: |
-          Rename-Computer -NewName "kazugay" -Force
-          # Yêu cầu khởi động lại
-          Write-Host "Máy tính sẽ khởi động lại sau để áp dụng tên mới..."
-          # Lưu ý: Bước này sẽ gây khởi động lại và có thể ảnh hưởng đến workflow
-
-      - name: Create RDP User with Fixed Password
-        run: |
-          $password = "yukkiwashere"
+          # Tạo mật khẩu ngẫu nhiên đáp ứng yêu cầu bảo mật của Windows
+          Add-Type -AssemblyName System.Web
+          $password = [System.Web.Security.Membership]::GeneratePassword(12, 2)
           $securePass = ConvertTo-SecureString $password -AsPlainText -Force
+          
           New-LocalUser -Name "RDP" -Password $securePass -AccountNeverExpires
           Add-LocalGroupMember -Group "Administrators" -Member "RDP"
           Add-LocalGroupMember -Group "Remote Desktop Users" -Member "RDP"
          
           echo "RDP_CREDS=User: RDP | Password: $password" >> $env:GITHUB_ENV
 
-      - name: Get Public IP Information
-        run: |
-          # Cố gắng lấy public IP (nếu có)
-          $publicIP = (Invoke-RestMethod -Uri "https://api.ipify.org" -ErrorAction SilentlyContinue)
-          if ($publicIP) {
-            echo "PUBLIC_IP=$publicIP" >> $env:GITHUB_ENV
-          } else {
-            Write-Warning "Không thể lấy Public IP. Có thể runner không có public IP trực tiếp."
-          }
-
       - name: Install Ngrok for Public Tunnel
         run: |
-          # Tải và cài đặt Ngrok để tạo tunnel public
           $ngrokUrl = "https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip"
           $ngrokPath = "$env:TEMP\ngrok.zip"
           Invoke-WebRequest -Uri $ngrokUrl -OutFile $ngrokPath
           Expand-Archive -Path $ngrokPath -DestinationPath "C:\ngrok" -Force
           $env:Path += ";C:\ngrok"
 
+      - name: Configure Ngrok with Auth Token
+        run: |
+          C:\ngrok\ngrok.exe authtoken ${{ secrets.NGROK_AUTHTOKEN }}
+
       - name: Create Ngrok Tunnel
         run: |
-          # Khởi chạy Ngrok tunnel cho cổng 3389
           Start-Process -FilePath "C:\ngrok\ngrok.exe" -ArgumentList "tcp 3389" -WindowStyle Hidden
-          Start-Sleep -Seconds 10  # Chờ ngrok khởi động
+          Start-Sleep -Seconds 10
 
-          # Lấy thông tin tunnel từ API ngrok
           $tunnelInfo = (Invoke-RestMethod -Uri "http://localhost:4040/api/tunnels" -ErrorAction SilentlyContinue)
           if ($tunnelInfo) {
             $publicUrl = $tunnelInfo.tunnels[0].public_url
@@ -79,13 +66,9 @@ jobs:
       - name: Display Connection Information
         run: |
           Write-Host "`n=== RDP ACCESS ==="
-          Write-Host "Computer Name: kazugay"
-          if ($env:PUBLIC_IP) {
-            Write-Host "Public IP: $env:PUBLIC_IP"
-          }
           Write-Host "Ngrok Public URL: $env:NGROK_PUBLIC_URL"
           Write-Host "Username: RDP"
-          Write-Host "Password: yukki_washere"
+          Write-Host "Password: $(echo $env:RDP_CREDS | split '|' -Last)"
           Write-Host "==================`n"
 
       - name: Maintain Connection
