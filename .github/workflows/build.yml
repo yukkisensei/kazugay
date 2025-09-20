@@ -55,6 +55,14 @@ jobs:
           meson --version
           ninja --version
 
+      - name: Compile dependency hyprwayland-scanner
+        run: |
+          git clone https://github.com/hyprwm/hyprwayland-scanner.git
+          cd hyprwayland-scanner
+          meson setup build
+          ninja -C build
+          sudo ninja -C build install
+
       - name: Compile dependency aquamarine
         run: |
           git clone https://github.com/hyprwm/aquamarine.git
