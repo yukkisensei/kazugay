@@ -63,6 +63,11 @@ jobs:
           cmake --build build -j$(nproc)
           sudo cmake --install build
 
+      - name: Verify hyprwayland-scanner
+        run: |
+          which hyprwayland-scanner || true
+          hyprwayland-scanner --version || true
+
       - name: Compile dependency aquamarine
         run: |
           git clone https://github.com/hyprwm/aquamarine.git
