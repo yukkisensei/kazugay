@@ -82,7 +82,7 @@ jobs:
           cd libdisplay-info
           meson setup build
           ninja -C build
-          sudo ninja -C build install
+          python3 -m mesonbuild.mesonmain install --no-rebuild -C build
 
       - name: Compile dependency aquamarine
         run: |
