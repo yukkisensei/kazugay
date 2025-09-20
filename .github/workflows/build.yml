@@ -74,23 +74,21 @@ jobs:
           USER=kazugay
           HOME=/home/$USER
           sudo -u $USER mkdir -p $HOME/.config/hypr
-
-cat > /home/$USER/.config/hypr/hyprland.conf <<'EOF'
-# Minimal config
-exec = swaybg -c "#2e3440"
-exec = waybar
-exec = xterm
-exec = firefox
-monitor=,preferred,auto,auto
-general {
-    gaps_in=5
-    gaps_out=20
-    border_size=2
-    col.active_border=0xff5e81ac
-    col.inactive_border=0xff3b4252
-}
-EOF
-
+          printf '%s\n' \
+"# Minimal config" \
+"exec = swaybg -c \"#2e3440\"" \
+"exec = waybar" \
+"exec = xterm" \
+"exec = firefox" \
+"monitor=,preferred,auto,auto" \
+"general {" \
+"    gaps_in=5" \
+"    gaps_out=20" \
+"    border_size=2" \
+"    col.active_border=0xff5e81ac" \
+"    col.inactive_border=0xff3b4252" \
+"}" \
+          | sudo -u $USER tee /home/$USER/.config/hypr/hyprland.conf
           sudo chown $USER:$USER /home/$USER/.config/hypr/hyprland.conf
 
       - name: Setup service
