@@ -26,6 +26,7 @@ jobs:
             libxcb-present-dev libxcb-damage0-dev \
             libxcb-randr0-dev libxcb-xinput-dev \
             libxcb-xinerama0-dev libxcb-xkb-dev \
+            libpugixml-dev \
             xwayland dbus-x11 openssl swaybg waybar xterm firefox
 
       - name: Setup user
