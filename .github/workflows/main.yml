@@ -1,100 +1,126 @@
-name: RDP
+name: Hyprland-VNC
 
 on:
   workflow_dispatch:
 
 jobs:
-  secure-rdp:
-    runs-on: windows-latest
+  hyprland:
+    runs-on: ubuntu-22.04
     timeout-minutes: 3600
 
     steps:
-      - name: Configure Core RDP Settings
+      - name: Update & Install Dependencies
         run: |
-          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' `
-                             -Name "fDenyTSConnections" -Value 0 -Force
-          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' `
-                             -Name "UserAuthentication" -Value 0 -Force
-          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' `
-                             -Name "SecurityLayer" -Value 0 -Force
+          sudo apt-get update
+          sudo apt-get install -y \
+            git curl wget unzip build-essential software-properties-common \
+            cmake pkg-config python3 python3-pip \
+            libwayland-dev wayland-protocols \
+            libxkbcommon-dev libseat-dev \
+            libdrm-dev libgles2-mesa-dev \
+            libpixman-1-dev libvulkan-dev \
+            libinput-dev libxcb1-dev libxcb-composite0-dev \
+            libxcb-xfixes0-dev libxcb-render0-dev \
+            libxcb-icccm4-dev libxcb-image0-dev \
+            libxcb-util-dev libxcb-ewmh-dev \
+            libxcb-present-dev libxcb-damage0-dev \
+            libxcb-randr0-dev libxcb-xinput-dev \
+            libxcb-xinerama0-dev libxcb-xkb-dev \
+            xwayland dbus-x11 openssl swaybg waybar xterm firefox
 
-          netsh advfirewall firewall delete rule name="RDP-Tailscale" 2>&1 | Out-Null
-          netsh advfirewall firewall add rule name="RDP-Tailscale" `
-            dir=in action=allow protocol=TCP localport=3389
-
-          try {
-            Restart-Service -Name TermService -Force -ErrorAction Stop
-          } catch {
-            Write-Warning "Service restart failed but continuing: $($_.Exception.Message)"
-          }
-
-      - name: Create RDP User with Secure Password
+      - name: Create User with Random Password
         run: |
-          $charSet = @{
-              Upper   = [char[]](65..90)
-              Lower   = [char[]](97..122)
-              Number  = [char[]](48..57)
-              Special = [char[]]('!@#$%^&*'.ToCharArray())
-          }
-          $rawPassword = @()
-          $rawPassword += $charSet.Upper | Get-Random -Count 3
-          $rawPassword += $charSet.Lower | Get-Random -Count 3
-          $rawPassword += $charSet.Number | Get-Random -Count 3
-          $rawPassword += $charSet.Special | Get-Random -Count 3
-          $password = -join ($rawPassword | Sort-Object { Get-Random })
-          $securePass = ConvertTo-SecureString $password -AsPlainText -Force
-          
-          # Sử dụng username "kazugay" theo yêu cầu
-          New-LocalUser -Name "kazugay" -Password $securePass -AccountNeverExpires
-          Add-LocalGroupMember -Group "Administrators" -Member "kazugay"
-          Add-LocalGroupMember -Group "Remote Desktop Users" -Member "kazugay"
-         
-          echo "RDP_CREDS=User: kazugay | Password: $password" >> $env:GITHUB_ENV
+          PASS=$(openssl rand -base64 12 | tr -dc 'A-Za-z0-9' | head -c16)
+          sudo useradd -m -s /bin/bash kazugay
+          echo "kazugay:$PASS" | sudo chpasswd
+          sudo usermod -aG sudo kazugay
+          echo "RDP_USER=kazugay" >> $GITHUB_ENV
+          echo "RDP_PASS=$PASS" >> $GITHUB_ENV
 
-      - name: Install Tailscale
+      - name: Install Clang 18 + LLD
         run: |
-          $tsUrl = "https://pkgs.tailscale.com/stable/tailscale-setup-latest-amd64.msi"
-          $installerPath = "$env:TEMP\tailscale.msi"
-          Invoke-WebRequest -Uri $tsUrl -OutFile $installerPath
-          Start-Process msiexec.exe -ArgumentList "/i", "`"$installerPath`"", "/quiet", "/norestart" -Wait
-          Remove-Item $installerPath -Force
+          sudo apt-get install -y clang-18 lld-18
+          sudo update-alternatives --install /usr/bin/cc cc /usr/bin/clang-18 60
+          sudo update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++-18 60
+          clang --version
+          clang++ --version
 
-      - name: Establish Tailscale Connection
+      - name: Upgrade Meson & Ninja
         run: |
-          & "$env:ProgramFiles\Tailscale\tailscale.exe" up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=gh-runner-$env:GITHUB_RUN_ID
-          
-          $tsIP = $null
-          $retries = 0
-          while (-not $tsIP -and $retries -lt 10) {
-              $tsIP = & "$env:ProgramFiles\Tailscale\tailscale.exe" ip -4
-              Start-Sleep -Seconds 5
-              $retries++
-          }
-          
-          if (-not $tsIP) {
-              Write-Error "Tailscale IP not assigned. Exiting."
-              exit 1
-          }
-          echo "TAILSCALE_IP=$tsIP" >> $env:GITHUB_ENV
+          sudo apt-get remove -y meson || true
+          python3 -m pip install --upgrade pip setuptools wheel
+          python3 -m pip install meson ninja
+          meson --version
+          ninja --version
 
-      - name: Display Connection Information
+      - name: Build & Install Hyprland
         run: |
-          Write-Host "`n=== RDP ACCESS ==="
-          Write-Host "Tailscale IP: $env:TAILSCALE_IP"
-          Write-Host "Username: kazugay"
-          Write-Host "Password: $(echo $env:RDP_CREDS | ForEach-Object { $_.Split('|')[-1].Trim() })"
-          Write-Host "==================`n"
-          Write-Host "Để kết nối:"
-          Write-Host "1. Cài đặt Tailscale trên máy của bạn"
-          Write-Host "2. Đăng nhập cùng tài khoản với Auth Key đã dùng"
-          Write-Host "3. Kết nối RDP đến địa chỉ IP trên"
+          git clone --recursive https://github.com/hyprwm/Hyprland
+          cd Hyprland
+          meson setup build
+          ninja -C build
+          sudo ninja -C build install
 
-      - name: Maintain Connection
+      - name: Build & Install WayVNC
         run: |
-          while ($true) {
-            Write-Host "[$(Get-Date)] RDP Active - Sử dụng Ctrl+C trong workflow để kết thúc"
-            Write-Host "IP: $env:TAILSCALE_IP"
-            Write-Host "User: kazugay"
-            Write-Host "Password: $(echo $env:RDP_CREDS | ForEach-Object { $_.Split('|')[-1].Trim() })"
-            Start-Sleep -Seconds 300
-          }
+          git clone https://github.com/any1/wayvnc.git
+          cd wayvnc
+          meson setup build
+          ninja -C build
+          sudo ninja -C build install
+
+      - name: Setup Hyprland Config
+        run: |
+          USER=kazugay
+          HOME=/home/$USER
+          sudo -u $USER mkdir -p $HOME/.config/hypr
+          cat <<EOF | sudo -u $USER tee $HOME/.config/hypr/hyprland.conf
+# Hyprland minimal config
+
+exec = swaybg -c "#2e3440"   # gray background
+exec = waybar                # top bar
+exec = xterm                 # open terminal
+exec = firefox               # launch browser
+
+monitor=,preferred,auto,auto
+
+general {
+    gaps_in=5
+    gaps_out=20
+    border_size=2
+    col.active_border=0xff5e81ac
+    col.inactive_border=0xff3b4252
+}
+EOF
+
+      - name: Install & Setup Tailscale
+        run: |
+          curl -fsSL https://tailscale.com/install.sh | sh
+          sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=hyprland-${{ github.run_id }}
+
+      - name: Start Hyprland + WayVNC
+        run: |
+          TS_IP=$(tailscale ip -4)
+          PASS=$(echo $RDP_PASS)
+          USER=kazugay
+
+          echo "===================="
+          echo "Tailscale IP: $TS_IP"
+          echo "Username: $USER"
+          echo "Password: $PASS"
+          echo "VNC Port: 5900"
+          echo "===================="
+
+          # Start Hyprland
+          sudo -u $USER Hyprland &
+
+          # Start WayVNC with password
+          echo $PASS > /tmp/vncpass
+          chmod 600 /tmp/vncpass
+          sudo -u $USER wayvnc 0.0.0.0 5900 --passwordfile /tmp/vncpass &
+
+          # Keep runner alive
+          while true; do
+            echo "[$(date)] Hyprland VNC alive"
+            sleep 300
+          done
