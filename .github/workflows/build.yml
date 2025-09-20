@@ -5,7 +5,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 3600
 
     steps:
@@ -26,7 +26,7 @@ jobs:
             libxcb-present-dev libxcb-damage0-dev \
             libxcb-randr0-dev libxcb-xinput-dev \
             libxcb-xinerama0-dev libxcb-xkb-dev \
-            libpugixml-dev \
+            libpugixml-dev hwdata \
             xwayland dbus-x11 openssl swaybg waybar xterm firefox
 
       - name: Setup user
@@ -40,21 +40,15 @@ jobs:
 
       - name: Install compiler (Clang 18 + GCC 13 libstdc++)
         run: |
-          # Cài clang-18
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
           sudo ./llvm.sh 18
-
-          # Cài g++-13 để có libstdc++ mới với <format>
           sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
           sudo apt-get update
           sudo apt-get install -y g++-13
           sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-13 60
-
-          # Set clang-18 làm compiler mặc định
           sudo update-alternatives --install /usr/bin/cc cc /usr/bin/clang-18 60
           sudo update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++-18 60
-
           clang-18 --version
           g++ --version
 
@@ -74,10 +68,21 @@ jobs:
           cmake --build build -j$(nproc)
           sudo cmake --install build
 
-      - name: Verify hyprwayland-scanner
+      - name: Compile dependency hyprutils
         run: |
-          which hyprwayland-scanner || true
-          hyprwayland-scanner --version || true
+          git clone https://github.com/hyprwm/hyprutils.git
+          cd hyprutils
+          cmake -B build -DCMAKE_CXX_STANDARD=20
+          cmake --build build -j$(nproc)
+          sudo cmake --install build
+
+      - name: Compile dependency libdisplay-info
+        run: |
+          git clone https://gitlab.freedesktop.org/emersion/libdisplay-info.git
+          cd libdisplay-info
+          meson setup build
+          ninja -C build
+          sudo ninja -C build install
 
       - name: Compile dependency aquamarine
         run: |
