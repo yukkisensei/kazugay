@@ -38,15 +38,25 @@ jobs:
           echo "CI_USER=kazugay" >> $GITHUB_ENV
           echo "CI_PASS=$PASS" >> $GITHUB_ENV
 
-      - name: Install compiler (Clang 18 + LLD)
+      - name: Install compiler (Clang 18 + GCC 13 libstdc++)
         run: |
+          # Cài clang-18
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
           sudo ./llvm.sh 18
+
+          # Cài g++-13 để có libstdc++ mới với <format>
+          sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
+          sudo apt-get update
+          sudo apt-get install -y g++-13
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-13 60
+
+          # Set clang-18 làm compiler mặc định
           sudo update-alternatives --install /usr/bin/cc cc /usr/bin/clang-18 60
           sudo update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++-18 60
+
           clang-18 --version
-          clang++-18 --version
+          g++ --version
 
       - name: Upgrade build system
         run: |
@@ -60,7 +70,7 @@ jobs:
         run: |
           git clone https://github.com/hyprwm/hyprwayland-scanner.git
           cd hyprwayland-scanner
-          cmake -B build
+          cmake -B build -DCMAKE_CXX_STANDARD=20
           cmake --build build -j$(nproc)
           sudo cmake --install build
 
@@ -73,7 +83,7 @@ jobs:
         run: |
           git clone https://github.com/hyprwm/aquamarine.git
           cd aquamarine
-          cmake -B build
+          cmake -B build -DCMAKE_CXX_STANDARD=20
           cmake --build build -j$(nproc)
           sudo cmake --install build
 
