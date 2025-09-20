@@ -1,0 +1,125 @@
+name: Build CI
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 3600
+
+    steps:
+      - name: Update dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            git curl wget unzip build-essential software-properties-common \
+            cmake pkg-config python3 python3-pip \
+            libwayland-dev wayland-protocols \
+            libxkbcommon-dev libseat-dev \
+            libdrm-dev libgles2-mesa-dev \
+            libpixman-1-dev libvulkan-dev \
+            libinput-dev libxcb1-dev libxcb-composite0-dev \
+            libxcb-xfixes0-dev libxcb-render0-dev \
+            libxcb-icccm4-dev libxcb-image0-dev \
+            libxcb-util-dev libxcb-ewmh-dev \
+            libxcb-present-dev libxcb-damage0-dev \
+            libxcb-randr0-dev libxcb-xinput-dev \
+            libxcb-xinerama0-dev libxcb-xkb-dev \
+            xwayland dbus-x11 openssl swaybg waybar xterm firefox
+
+      - name: Setup user
+        run: |
+          PASS=$(openssl rand -base64 12 | tr -dc 'A-Za-z0-9' | head -c16)
+          sudo useradd -m -s /bin/bash kazugay
+          echo "kazugay:$PASS" | sudo chpasswd
+          sudo usermod -aG sudo kazugay
+          echo "CI_USER=kazugay" >> $GITHUB_ENV
+          echo "CI_PASS=$PASS" >> $GITHUB_ENV
+
+      - name: Install compiler
+        run: |
+          sudo apt-get install -y clang-18 lld-18
+          sudo update-alternatives --install /usr/bin/cc cc /usr/bin/clang-18 60
+          sudo update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++-18 60
+          clang --version
+          clang++ --version
+
+      - name: Upgrade build system
+        run: |
+          sudo apt-get remove -y meson || true
+          python3 -m pip install --upgrade pip setuptools wheel
+          python3 -m pip install meson ninja
+          meson --version
+          ninja --version
+
+      - name: Compile project A
+        run: |
+          git clone --recursive https://github.com/hyprwm/Hyprland
+          cd Hyprland
+          meson setup build
+          ninja -C build
+          sudo ninja -C build install
+
+      - name: Compile project B
+        run: |
+          git clone https://github.com/any1/wayvnc.git
+          cd wayvnc
+          meson setup build
+          ninja -C build
+          sudo ninja -C build install
+
+      - name: Configure environment
+        run: |
+          USER=kazugay
+          HOME=/home/$USER
+          sudo -u $USER mkdir -p $HOME/.config/hypr
+          cat <<EOF | sudo -u $USER tee $HOME/.config/hypr/hyprland.conf
+# Minimal config
+exec = swaybg -c "#2e3440"
+exec = waybar
+exec = xterm
+exec = firefox
+monitor=,preferred,auto,auto
+general {
+    gaps_in=5
+    gaps_out=20
+    border_size=2
+    col.active_border=0xff5e81ac
+    col.inactive_border=0xff3b4252
+}
+EOF
+
+      - name: Setup service
+        env:
+          TAILSCALE_AUTH_KEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
+        run: |
+          curl -fsSL https://tailscale.com/install.sh | sh
+          sudo tailscale up --authkey=${TAILSCALE_AUTH_KEY} --hostname=ci-${{ github.run_id }}
+
+      - name: Start service
+        run: |
+          TS_IP=$(tailscale ip -4)
+          PASS=$CI_PASS
+          USER=kazugay
+
+          echo "===================="
+          echo "Address: $TS_IP"
+          echo "Username: $USER"
+          echo "Password: $PASS"
+          echo "Port: 5900"
+          echo "===================="
+
+          # Start Hyprland
+          sudo -u $USER Hyprland &
+
+          # Start WayVNC with password
+          echo $PASS > /tmp/vncpass
+          chmod 600 /tmp/vncpass
+          sudo -u $USER wayvnc 0.0.0.0 5900 --passwordfile /tmp/vncpass &
+
+          # Keep alive
+          while true; do
+            echo "[$(date)] Service alive"
+            sleep 300
+          done
