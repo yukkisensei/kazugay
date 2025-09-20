@@ -74,7 +74,7 @@ jobs:
           USER=kazugay
           HOME=/home/$USER
           sudo -u $USER mkdir -p $HOME/.config/hypr
-          cat <<EOF | sudo -u $USER tee $HOME/.config/hypr/hyprland.conf
+          cat > /home/$USER/.config/hypr/hyprland.conf <<'EOF'
 # Minimal config
 exec = swaybg -c "#2e3440"
 exec = waybar
@@ -89,6 +89,7 @@ general {
     col.inactive_border=0xff3b4252
 }
 EOF
+          sudo chown $USER:$USER /home/$USER/.config/hypr/hyprland.conf
 
       - name: Setup service
         env:
