@@ -9,18 +9,15 @@ jobs:
     timeout-minutes: 3600
 
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup ccache cache
-        uses: actions/cache@v4
+      - uses: actions/cache@v4
         with:
           path: ~/.ccache
           key: ${{ runner.os }}-ccache-${{ github.run_id }}
-          restore-keys: |
-            ${{ runner.os }}-ccache-
+          restore-keys: ${{ runner.os }}-ccache-
 
-      - name: Update dependencies
+      - name: Install base deps
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -47,44 +44,29 @@ jobs:
           sudo curl -fsSLo /usr/share/keyrings/brave-browser-archive-keyring.gpg https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg
           echo "deb [signed-by=/usr/share/keyrings/brave-browser-archive-keyring.gpg] https://brave-browser-apt-release.s3.brave.com/ stable main" \
             | sudo tee /etc/apt/sources.list.d/brave-browser-release.list
-          sudo apt-get update
-          sudo apt-get install -y brave-browser
-
-          # Discord (latest .deb)
+          sudo apt-get update && sudo apt-get install -y brave-browser
+          # Discord
           wget -O discord.deb "https://discord.com/api/download?platform=linux&format=deb"
-          sudo apt-get install -y ./discord.deb
-          rm -f discord.deb
+          sudo apt-get install -y ./discord.deb && rm -f discord.deb
 
       - name: Setup user
         run: |
           PASS=$(openssl rand -base64 12 | tr -dc 'A-Za-z0-9' | head -c16)
           sudo useradd -m -s /bin/bash kazugay
           echo "kazugay:$PASS" | sudo chpasswd
-          sudo usermod -aG sudo kazugay
           echo "CI_USER=kazugay" >> $GITHUB_ENV
           echo "CI_PASS=$PASS" >> $GITHUB_ENV
 
-      - name: Install compiler (Clang 18 + GCC 13 libstdc++)
+      - name: Install compilers + build tools
         run: |
-          wget https://apt.llvm.org/llvm.sh
-          chmod +x llvm.sh
+          wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh
           sudo ./llvm.sh 18
           sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
-          sudo apt-get update
-          sudo apt-get install -y g++-13
+          sudo apt-get update && sudo apt-get install -y g++-13
           sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-13 60
           sudo update-alternatives --install /usr/bin/cc cc /usr/bin/clang-18 60
           sudo update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++-18 60
-          clang-18 --version
-          g++ --version
-
-      - name: Upgrade build system
-        run: |
-          sudo apt-get remove -y meson || true
-          python3 -m pip install --upgrade pip setuptools wheel
-          python3 -m pip install meson ninja
-          meson --version
-          ninja --version
+          sudo pip3 install --upgrade pip setuptools wheel meson ninja
 
       - name: Configure ccache
         run: |
@@ -94,95 +76,72 @@ jobs:
           echo "CC=ccache clang-18" >> $GITHUB_ENV
           echo "CXX=ccache clang++-18" >> $GITHUB_ENV
 
-      - name: Compile dependency hyprwayland-scanner
+      - name: Build hyprwayland-scanner
         run: |
           git clone https://github.com/hyprwm/hyprwayland-scanner.git
-          cd hyprwayland-scanner
-          cmake -B build -DCMAKE_CXX_STANDARD=20
+          cd hyprwayland-scanner && cmake -B build -DCMAKE_CXX_STANDARD=20
           cmake --build build -j$(nproc)
           sudo cmake --install build
 
-      - name: Compile dependency hyprutils
+      - name: Build hyprutils
         run: |
           git clone https://github.com/hyprwm/hyprutils.git
-          cd hyprutils
-          cmake -B build -DCMAKE_CXX_STANDARD=20
+          cd hyprutils && cmake -B build -DCMAKE_CXX_STANDARD=20
           cmake --build build -j$(nproc)
           sudo cmake --install build
 
-      - name: Compile dependency libdisplay-info
+      - name: Build libdisplay-info
         run: |
           git clone https://gitlab.freedesktop.org/emersion/libdisplay-info.git
-          cd libdisplay-info
-          meson setup build --prefix=/usr
+          cd libdisplay-info && meson setup build --prefix=/usr
           ninja -C build
-          sudo python3 -m mesonbuild.mesonmain install -C build
+          sudo meson install -C build
 
-      - name: Compile dependency aquamarine
+      - name: Build aquamarine
         run: |
           git clone https://github.com/hyprwm/aquamarine.git
-          cd aquamarine
-          cmake -B build -DCMAKE_CXX_STANDARD=20
+          cd aquamarine && cmake -B build -DCMAKE_CXX_STANDARD=20
           cmake --build build -j$(nproc)
           sudo cmake --install build
 
-      - name: Compile project Hyprland
+      - name: Build Hyprland
         run: |
           git clone --recursive https://github.com/hyprwm/Hyprland
-          cd Hyprland
-          meson setup build --prefix=/usr
+          cd Hyprland && meson setup build --prefix=/usr
           ninja -C build
-          sudo python3 -m mesonbuild.mesonmain install -C build
+          sudo meson install -C build
 
-      - name: Compile project WayVNC
+      - name: Build WayVNC
         run: |
           git clone https://github.com/any1/wayvnc.git
-          cd wayvnc
-          meson setup build --prefix=/usr
+          cd wayvnc && meson setup build --prefix=/usr
           ninja -C build
-          sudo python3 -m mesonbuild.mesonmain install -C build
+          sudo meson install -C build
 
-      - name: Configure environment
+      - name: Configure Hyprland env
         run: |
           USER=kazugay
           HOME=/home/$USER
           sudo -u $USER mkdir -p $HOME/.config/hypr
+          echo "exec = swaybg -c \"#2e3440\"\nexec = waybar\nexec = xterm\nexec = brave-browser\nexec = discord" \
+            | sudo -u $USER tee $HOME/.config/hypr/hyprland.conf
+          sudo chown $USER:$USER $HOME/.config/hypr/hyprland.conf
 
-          echo "IyBNaW5pbWFsIGNvbmZpZwpleGVjID0gc3dheWJnIC1jICIjMmUzNDQwIgoKZXhlYyA9IHdheWJhcgpleGVjID0geHRlcm0KZXhlYyA9IGZpcmVmb3gKbW9uaXRvcj0scHJlZmVycmVkLGF1dG8sYXV0bwpnZW5lcmFsIHsKICAgIGdhcHNfaW49NQogICAgZ2Fwc19vdXQ9MjAKICAgIGJvcmRlcl9zaXplPTIKICAgIGNvbC5hY3RpdmVfYm9yZGVyPTB4ZmY1ZTgxYWMKICAgIGNvbC5pbmFjdGl2ZV9ib3JkZXI9MHhmZjNiNDI1MgpfCn0=" \
-          | base64 -d | sudo -u $USER tee /home/$USER/.config/hypr/hyprland.conf
-
-          sudo chown $USER:$USER /home/$USER/.config/hypr/hyprland.conf
-
-      - name: Setup service
+      - name: Setup Tailscale
         env:
           TAILSCALE_AUTH_KEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
         run: |
           curl -fsSL https://tailscale.com/install.sh | sh
           sudo tailscale up --authkey=${TAILSCALE_AUTH_KEY} --hostname=ci-${{ github.run_id }}
 
-      - name: Start service
+      - name: Start services
         run: |
           TS_IP=$(tailscale ip -4)
-          PASS=$CI_PASS
-          USER=kazugay
-
-          echo "===================="
           echo "Address: $TS_IP"
-          echo "Username: $USER"
-          echo "Password: $PASS"
+          echo "Username: kazugay"
+          echo "Password: $CI_PASS"
           echo "Port: 5900"
-          echo "===================="
-
-          # Start Hyprland
-          sudo -u $USER Hyprland &
-
-          # Start WayVNC with password
-          echo $PASS > /tmp/vncpass
-          chmod 600 /tmp/vncpass
-          sudo -u $USER wayvnc 0.0.0.0 5900 --passwordfile /tmp/vncpass &
-
-          # Keep alive
-          while true; do
-            echo "[$(date)] Service alive"
-            sleep 300
-          done
+          sudo -u kazugay Hyprland &
+          echo $CI_PASS > /tmp/vncpass && chmod 600 /tmp/vncpass
+          sudo -u kazugay wayvnc 0.0.0.0 5900 --passwordfile /tmp/vncpass &
+          while true; do sleep 300; done
