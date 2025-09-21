@@ -57,6 +57,14 @@ jobs:
           sudo apt-get install -y -qq ./discord.deb || sudo apt-get install -f -y -qq
           rm -f discord.deb
 
+      - name: Build hyprwayland-scanner
+        run: |
+          sudo -u yuu git clone --recursive https://github.com/hyprwm/hyprwayland-scanner.git /home/yuu/hyprwayland-scanner
+          cd /home/yuu/hyprwayland-scanner
+          sudo -u yuu meson setup build --prefix=/usr --buildtype=release
+          sudo -u yuu ninja -C build -j$(nproc)
+          sudo ninja -C build install
+
       - name: Build Aquamarine
         run: |
           sudo -u yuu git clone --recursive https://github.com/hyprwm/aquamarine.git /home/yuu/aquamarine
