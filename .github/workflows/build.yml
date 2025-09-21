@@ -1,4 +1,4 @@
-name: Build CI
+name: yukki Ci
 
 on:
   workflow_dispatch:
@@ -63,9 +63,9 @@ jobs:
       - name: Setup user
         run: |
           PASS=$(openssl rand -base64 12 | tr -dc 'A-Za-z0-9' | head -c16)
-          sudo useradd -m -s /bin/bash kazugay
-          echo "kazugay:$PASS" | sudo chpasswd
-          echo "CI_USER=kazugay" >> $GITHUB_ENV
+          sudo useradd -m -s /bin/bash yuu
+          echo "yuu:$PASS" | sudo chpasswd
+          echo "CI_USER=yuu" >> $GITHUB_ENV
           echo "CI_PASS=$PASS" >> $GITHUB_ENV
 
       - name: Install compilers + build tools
@@ -131,20 +131,39 @@ jobs:
           sudo cp -r tomlplusplus/include/* /usr/include/toml++/
           rm -rf tomlplusplus
 
-      - name: Patch & Build WLComp
+      - name: Fake pkg-config entries
+        run: |
+          sudo mkdir -p /usr/lib/x86_64-linux-gnu/pkgconfig
+          # hyprlang.pc
+          cat <<EOF | sudo tee /usr/lib/x86_64-linux-gnu/pkgconfig/hyprlang.pc
+          prefix=/usr
+          exec_prefix=\${prefix}
+          includedir=\${prefix}/include
+          libdir=\${exec_prefix}/lib
+
+          Name: hyprlang
+          Description: Hyprland language parser (fake pc)
+          Version: 0.4.2
+          Cflags: -I\${includedir}
+          Libs: -L\${libdir} -lhyprlang
+          EOF
+
+          # tomlplusplus.pc
+          cat <<EOF | sudo tee /usr/lib/x86_64-linux-gnu/pkgconfig/tomlplusplus.pc
+          prefix=/usr
+          includedir=\${prefix}/include
+
+          Name: tomlplusplus
+          Description: TOML++ header-only library (fake pc)
+          Version: 3.4.0
+          Cflags: -I\${includedir}/toml++
+          Libs:
+          EOF
+
+      - name: Build WLComp
         run: |
           git clone -q --recursive https://github.com/hyprwm/Hyprland.git
           cd Hyprland
-          echo ">>> Grep for pkg_check_modules before patch <<<"
-          grep -R "pkg_check_modules" . || true
-
-          # Remove pkg_check_modules lines
-          find . -type f -name "CMakeLists.txt" -exec sed -i '/pkg_check_modules.*hyprlang/d' {} +
-          find . -type f -name "CMakeLists.txt" -exec sed -i '/pkg_check_modules.*tomlplusplus/d' {} +
-
-          echo ">>> Grep for pkg_check_modules after patch <<<"
-          grep -R "pkg_check_modules" . || true
-
           meson setup build --prefix=/usr
           ninja -C build > /dev/null
           sudo meson install -C build > /dev/null
@@ -159,7 +178,7 @@ jobs:
 
       - name: Configure WLComp env
         run: |
-          USER=kazugay
+          USER=yuu
           HOME=/home/$USER
           sudo -u $USER mkdir -p $HOME/.config/wlcomp
           echo "exec = swaybg -c \"#2e3440\"\nexec = waybar\nexec = xterm\nexec = brave-browser\nexec = discord" \
@@ -176,10 +195,10 @@ jobs:
         run: |
           TS_IP=$(tailscale ip -4)
           echo "Address: $TS_IP"
-          echo "Username: kazugay"
+          echo "Username: yuu"
           echo "Password: $CI_PASS"
           echo "Port: 5900"
-          sudo -u kazugay WLComp &
+          sudo -u yuu WLComp &
           echo $CI_PASS > /tmp/vncpass && chmod 600 /tmp/vncpass
-          sudo -u kazugay wayvnc 0.0.0.0 5900 --passwordfile /tmp/vncpass &
+          sudo -u yuu wayvnc 0.0.0.0 5900 --passwordfile /tmp/vncpass &
           while true; do sleep 300; done
