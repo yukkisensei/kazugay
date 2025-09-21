@@ -32,7 +32,7 @@ jobs:
             libxcb-util-dev libxcb-ewmh-dev libxcb-present-dev \
             libxcb-damage0-dev libxcb-randr0-dev libxcb-xinput-dev \
             libxcb-xinerama0-dev libxcb-xkb-dev libpugixml-dev hwdata \
-            xwayland dbus-x11 openssl swaybg waybar kitty \
+            xwayland dbus-x11 openssl swaybg waybar kitty weston \
             libgbm-dev libudev-dev libevdev-dev libmtdev-dev \
             libluajit-5.1-dev libwacom-dev libgtk-3-dev libzip-dev librsvg2-dev \
             ccache
@@ -54,35 +54,24 @@ jobs:
 
           # Discord
           wget -q -O discord.deb "https://discord.com/api/download?platform=linux&format=deb"
-          sudo apt-get install -y -qq ./discord.deb > /dev/null
+          sudo apt-get install -y -qq ./discord.deb || sudo apt-get install -f -y
           rm -f discord.deb
 
-      - name: Build Hyprland (auto deps)
+      - name: Build Hyprland
         run: |
           sudo -u yuu git clone --recursive https://github.com/hyprwm/Hyprland.git /home/yuu/Hyprland
           cd /home/yuu/Hyprland
-          sudo -u yuu env CC="ccache clang-18" CXX="ccache clang++-18" ./scripts/compile.sh --install
+          sudo -u yuu meson setup --buildtype=release --prefix /usr build
+          sudo -u yuu ninja -C build -j$(nproc)
+          sudo ninja -C build install
 
       - name: Build WayVNC
         run: |
           sudo -u yuu git clone https://github.com/any1/wayvnc.git /home/yuu/wayvnc
           cd /home/yuu/wayvnc
-          sudo -u yuu env CC="ccache clang-18" CXX="ccache clang++-18" meson setup build --prefix=/usr
+          sudo -u yuu meson setup build --prefix=/usr
           sudo -u yuu ninja -C build -j$(nproc)
           sudo meson install -C build
-
-      - name: Configure WLComp session
-        run: |
-          USER=yuu
-          HOME=/home/$USER
-          sudo -u $USER mkdir -p $HOME/.config/hypr
-          cat <<EOF | sudo -u $USER tee $HOME/.config/hypr/hyprland.conf
-          exec = swaybg -c "#2e3440"
-          exec = waybar
-          exec = kitty
-          exec = brave-browser
-          exec = discord
-          EOF
 
       - name: Setup Tailscale
         env:
@@ -91,17 +80,18 @@ jobs:
           curl -fsSL https://tailscale.com/install.sh | sh
           sudo tailscale up --authkey=${TAILSCALE_AUTH_KEY} --hostname=ci-${{ github.run_id }}
 
-      - name: Start Hyprland with VNC
+      - name: Start Weston headless + VNC
         run: |
           USER=yuu
           HOME=/home/$USER
-          sudo -u $USER Hyprland &
+          sudo -u $USER weston --backend=headless-backend.so --socket=wayland-1 &
+          sleep 5
           echo $CI_PASS > /tmp/vncpass && chmod 600 /tmp/vncpass
-          sudo -u $USER wayvnc 0.0.0.0 5900 --passwordfile /tmp/vncpass &
+          sudo -u $USER WAYLAND_DISPLAY=wayland-1 wayvnc 0.0.0.0 5900 --passwordfile /tmp/vncpass &
           TS_IP=$(tailscale ip -4)
           echo "==== CONNECT INFO ===="
           echo "Address: $TS_IP"
-          echo "Username: yuu"
+          echo "Username: $USER"
           echo "Password: $CI_PASS"
           echo "Port: 5900"
           while true; do sleep 300; done
