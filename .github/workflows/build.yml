@@ -38,7 +38,7 @@ jobs:
             libpugixml-dev hwdata \
             xwayland dbus-x11 openssl swaybg waybar xterm \
             ccache > /dev/null
-          echo "Done!"
+          echo "Base packages done!"
 
       - name: Install Brave + Discord
         run: |
@@ -65,18 +65,16 @@ jobs:
 
       - name: Install compilers + build tools
         run: |
-          echo "Installing compilers..."
+          echo "Installing compilers & build tools..."
           wget -q https://apt.llvm.org/llvm.sh && chmod +x llvm.sh
           sudo ./llvm.sh 18 > /dev/null
           sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test > /dev/null
           sudo apt-get update -qq
-          sudo apt-get install -y -qq g++-13 > /dev/null
+          sudo apt-get install -y -qq g++-13 meson ninja-build > /dev/null
           sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-13 60
           sudo update-alternatives --install /usr/bin/cc cc /usr/bin/clang-18 60
           sudo update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++-18 60
-          python3 -m pip install --upgrade pip setuptools wheel --break-system-packages > /dev/null
-          python3 -m pip install meson ninja --break-system-packages > /dev/null
-          echo "Compilers & build tools done!"
+          echo "Compilers ready!"
 
       - name: Configure ccache
         run: |
