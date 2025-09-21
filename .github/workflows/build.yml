@@ -127,6 +127,13 @@ jobs:
           sudo cmake --install build > /dev/null
           cd ..
 
+          echo "Building hyprcursor..."
+          git clone -q --depth=1 https://github.com/hyprwm/hyprcursor.git
+          cd hyprcursor && cmake -B build -DCMAKE_CXX_STANDARD=20
+          cmake --build build -j$(nproc) > /dev/null
+          sudo cmake --install build > /dev/null
+          cd ..
+
           echo "Building Hyprland..."
           git clone -q --recursive --depth=1 https://github.com/hyprwm/Hyprland
           cd Hyprland && meson setup build --prefix=/usr
