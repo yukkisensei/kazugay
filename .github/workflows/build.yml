@@ -19,7 +19,7 @@ jobs:
           echo "CI_USER=yuu" >> $GITHUB_ENV
           echo "CI_PASS=$PASS" >> $GITHUB_ENV
 
-      - name: Install deps + Clang 19
+      - name: Install deps + Clang 19 + libc++
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq \
@@ -31,6 +31,7 @@ jobs:
             libgbm-dev libudev-dev libevdev-dev libmtdev-dev \
             libluajit-5.1-dev libwacom-dev libgtk-3-dev libzip-dev librsvg2-dev \
             libpugixml-dev \
+            libc++-19-dev libc++abi-19-dev \
             ccache
 
           wget -q https://apt.llvm.org/llvm.sh
@@ -74,7 +75,8 @@ jobs:
         run: |
           sudo -u yuu git clone --recursive https://github.com/hyprwm/hyprutils.git /home/yuu/hyprutils
           cd /home/yuu/hyprutils
-          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_CXX_STANDARD=23
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr \
+            -DCMAKE_CXX_STANDARD=23 -DCMAKE_CXX_FLAGS="-stdlib=libc++"
           cmake --build build -j$(nproc)
           sudo cmake --install build
 
@@ -82,7 +84,8 @@ jobs:
         run: |
           sudo -u yuu git clone --recursive https://github.com/hyprwm/hyprwayland-scanner.git /home/yuu/hyprwayland-scanner
           cd /home/yuu/hyprwayland-scanner
-          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_CXX_STANDARD=23
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr \
+            -DCMAKE_CXX_STANDARD=23 -DCMAKE_CXX_FLAGS="-stdlib=libc++"
           cmake --build build -j$(nproc)
           sudo cmake --install build
 
@@ -90,7 +93,8 @@ jobs:
         run: |
           sudo -u yuu git clone --recursive https://github.com/hyprwm/hyprlang.git /home/yuu/hyprlang
           cd /home/yuu/hyprlang
-          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_CXX_STANDARD=23
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr \
+            -DCMAKE_CXX_STANDARD=23 -DCMAKE_CXX_FLAGS="-stdlib=libc++"
           cmake --build build -j$(nproc)
           sudo cmake --install build
 
@@ -98,7 +102,6 @@ jobs:
         run: |
           sudo -u yuu git clone https://github.com/marzer/tomlplusplus.git /home/yuu/tomlplusplus
           sudo cp -r /home/yuu/tomlplusplus/include/toml++ /usr/include/
-          # tạo pkg-config file cho toml++
           echo "prefix=/usr
 includedir=\${prefix}/include
 
@@ -111,7 +114,8 @@ Cflags: -I\${includedir}/toml++" | sudo tee /usr/lib/pkgconfig/tomlplusplus.pc
         run: |
           sudo -u yuu git clone --recursive https://github.com/hyprwm/hyprcursor.git /home/yuu/hyprcursor
           cd /home/yuu/hyprcursor
-          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_CXX_STANDARD=23
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr \
+            -DCMAKE_CXX_STANDARD=23 -DCMAKE_CXX_FLAGS="-stdlib=libc++"
           cmake --build build -j$(nproc)
           sudo cmake --install build
 
@@ -119,7 +123,8 @@ Cflags: -I\${includedir}/toml++" | sudo tee /usr/lib/pkgconfig/tomlplusplus.pc
         run: |
           sudo -u yuu git clone --recursive https://github.com/hyprwm/aquamarine.git /home/yuu/aquamarine
           cd /home/yuu/aquamarine
-          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_CXX_STANDARD=23
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr \
+            -DCMAKE_CXX_STANDARD=23 -DCMAKE_CXX_FLAGS="-stdlib=libc++"
           cmake --build build -j$(nproc)
           sudo cmake --install build
 
