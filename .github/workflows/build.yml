@@ -30,6 +30,7 @@ jobs:
             xwayland dbus-x11 openssl swaybg waybar kitty weston \
             libgbm-dev libudev-dev libevdev-dev libmtdev-dev \
             libluajit-5.1-dev libwacom-dev libgtk-3-dev libzip-dev librsvg2-dev \
+            libpugixml-dev \
             ccache
 
           wget -q https://apt.llvm.org/llvm.sh
@@ -52,7 +53,6 @@ jobs:
           sudo apt-get install -y -qq ./discord.deb || sudo apt-get install -f -y -qq
           rm -f discord.deb
 
-      # === Dependencies ===
       - name: Build libdisplay-info
         run: |
           sudo -u yuu git clone --recursive https://gitlab.freedesktop.org/emersion/libdisplay-info.git /home/yuu/libdisplay-info
@@ -93,7 +93,6 @@ jobs:
           cmake --build build -j$(nproc)
           sudo cmake --install build
 
-      # === Hyprland + WayVNC ===
       - name: Build Hyprland
         run: |
           sudo -u yuu git clone --recursive https://github.com/hyprwm/Hyprland.git /home/yuu/Hyprland
@@ -110,7 +109,6 @@ jobs:
           sudo -u yuu ninja -C build -j$(nproc) -q
           sudo meson install -C build -q
 
-      # === Networking ===
       - name: Setup Tailscale
         env:
           TAILSCALE_AUTH_KEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
