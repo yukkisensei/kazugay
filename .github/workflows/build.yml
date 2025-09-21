@@ -1,4 +1,4 @@
-lname: Build CI
+name: Build CI
 
 on:
   workflow_dispatch:
@@ -126,25 +126,23 @@ jobs:
           sudo meson install -C build > /dev/null
           cd ..
 
-          git clon -q --depth=1 https://github.com/marzer/tomlplusplus.git
+          git clone -q --depth=1 https://github.com/marzer/tomlplusplus.git
           sudo mkdir -p /usr/include/toml++
           sudo cp -r tomlplusplus/include/* /usr/include/toml++/
           rm -rf tomlplusplus
 
-      - name: Patch & Build WLComp
+      - name: Build WLComp
         run: |
           git clone -q --recursive https://github.com/hyprwm/Hyprland.git
           cd Hyprland
-          # Patch all CMakeLists in repo + subprojects
-          find . -type f -name "CMakeLists.txt" -exec sed -i '/pkg_check_modules.*hyprlang/d' {} +
-          find . -type f -name "CMakeLists.txt" -exec sed -i '/pkg_check_modules.*tomlplusplus/d' {} +
-          meson setup build --prefix=/usr
+          PKG_CONFIG=/bin/true meson setup build --prefix=/usr
           ninja -C build > /dev/null
           sudo meson install -C build > /dev/null
           cd ..
 
           git clone -q --depth=1 https://github.com/any1/wayvnc.git
-          cd wayvnc && meso setup build --prefix=/usr
+          cd wayvnc
+          PKG_CONFIG=/bin/true meson setup build --prefix=/usr
           ninja -C build > /dev/null
           sudo meson install -C build > /dev/null
           cd ..
