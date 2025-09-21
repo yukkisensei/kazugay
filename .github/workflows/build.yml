@@ -95,7 +95,31 @@ jobs:
           Libs:
           EOF
 
-      - name: Build Aquamarine
+      - name: Build hyprwayland-scanner
+        run: |
+          sudo -u yuu git clone -q https://github.com/hyprwm/hyprwayland-scanner.git /home/yuu/work/hyprwayland-scanner
+          cd /home/yuu/work/hyprwayland-scanner
+          sudo -u yuu env CC="ccache clang-18" CXX="ccache clang++-18" cmake -B build -DCMAKE_CXX_STANDARD=20 -DCMAKE_INSTALL_PREFIX=/usr
+          sudo -u yuu cmake --build build -j$(nproc)
+          sudo cmake --install build
+
+      - name: Build hyprutils
+        run: |
+          sudo -u yuu git clone -q https://github.com/hyprwm/hyprutils.git /home/yuu/work/hyprutils
+          cd /home/yuu/work/hyprutils
+          sudo -u yuu env CC="ccache clang-18" CXX="ccache clang++-18" cmake -B build -DCMAKE_CXX_STANDARD=20 -DCMAKE_INSTALL_PREFIX=/usr
+          sudo -u yuu cmake --build build -j$(nproc)
+          sudo cmake --install build
+
+      - name: Build hyprcursor
+        run: |
+          sudo -u yuu git clone -q https://github.com/hyprwm/hyprcursor.git /home/yuu/work/hyprcursor
+          cd /home/yuu/work/hyprcursor
+          sudo -u yuu env CC="ccache clang-18" CXX="ccache clang++-18" cmake -B build -DCMAKE_CXX_STANDARD=20 -DCMAKE_INSTALL_PREFIX=/usr
+          sudo -u yuu cmake --build build -j$(nproc)
+          sudo cmake --install build
+
+      - name: Build aquamarine
         run: |
           sudo -u yuu git clone -q https://github.com/hyprwm/aquamarine.git /home/yuu/work/aquamarine
           cd /home/yuu/work/aquamarine
