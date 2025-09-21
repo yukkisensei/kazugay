@@ -70,7 +70,7 @@ jobs:
           chmod +x llvm.sh
           sudo ./llvm.sh 18
 
-      - name: Fake pkg-config entries
+      - name: Fake pkg-config hyprlang
         run: |
           sudo mkdir -p /usr/lib/x86_64-linux-gnu/pkgconfig
           cat <<EOF | sudo tee /usr/lib/x86_64-linux-gnu/pkgconfig/hyprlang.pc
@@ -85,15 +85,26 @@ jobs:
           Libs: -L\${libdir} -lhyprlang
           EOF
 
+      - name: Install tomlplusplus
+        run: |
+          sudo -u yuu git clone -q https://github.com/marzer/tomlplusplus.git /home/yuu/work/tomlplusplus
+          cd /home/yuu/work/tomlplusplus
+          # Copy headers into /usr/include/toml++
+          sudo mkdir -p /usr/include/toml++
+          sudo cp -r include/toml++/* /usr/include/toml++/
+          # Write .pc file
+          sudo mkdir -p /usr/lib/x86_64-linux-gnu/pkgconfig
           cat <<EOF | sudo tee /usr/lib/x86_64-linux-gnu/pkgconfig/tomlplusplus.pc
           prefix=/usr
           includedir=\${prefix}/include
           Name: tomlplusplus
-          Description: TOML++ header-only library (fake pc)
+          Description: TOML++ header-only library
           Version: 3.4.0
           Cflags: -I\${includedir}/toml++
           Libs:
           EOF
+          cd ..
+          rm -rf /home/yuu/work/tomlplusplus
 
       - name: Build hyprwayland-scanner
         run: |
