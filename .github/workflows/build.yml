@@ -135,9 +135,12 @@ jobs:
         run: |
           git clone -q --recursive https://github.com/hyprwm/Hyprland.git
           cd Hyprland
-          # Xóa mọi pkg_check_modules cho hyprlang + tomlplusplus trong toàn repo
-          find . -type f -name "CMakeLists.txt" -exec sed -i '/pkg_check_modules.*hyprlang/d' {} +
-          find . -type f -name "CMakeLists.txt" -exec sed -i '/pkg_check_modules.*tomlplusplus/d' {} +
+          # Remove all pkg_check_modules for hyprlang and tomlplusplus everywhere
+          find . -type f -name "CMakeLists.txt" -print -exec sed -i '/pkg_check_modules.*hyprlang/d' {} +
+          find . -type f -name "CMakeLists.txt" -print -exec sed -i '/pkg_check_modules.*tomlplusplus/d' {} +
+          # Just in case meson.build also has checks
+          find . -type f -name "meson.build" -exec sed -i '/hyprlang/d' {} +
+          find . -type f -name "meson.build" -exec sed -i '/tomlplusplus/d' {} +
           meson setup build --prefix=/usr
           ninja -C build > /dev/null
           sudo meson install -C build > /dev/null
