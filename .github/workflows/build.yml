@@ -6,7 +6,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 360   # max 6 hours
 
     steps:
       - uses: actions/checkout@v4
@@ -62,7 +62,7 @@ jobs:
           brave-browser &
           discord &
           EOF
-          sudo chmod +x $HOME/.vnc/xstartup
+          sudo -u $USER chmod +x $HOME/.vnc/xstartup
 
       - name: Start VNC server
         run: |
@@ -70,11 +70,10 @@ jobs:
           HOME=/home/$USER
           sudo -u $USER mkdir -p $HOME/.vnc
           echo $CI_PASS | vncpasswd -f | sudo -u $USER tee $HOME/.vnc/passwd > /dev/null
-          sudo chown $USER:$USER $HOME/.vnc/passwd
-          chmod 600 $HOME/.vnc/passwd
+          sudo -u $USER chmod 600 $HOME/.vnc/passwd
           sudo -u $USER tightvncserver -geometry 1280x720 -depth 24 -rfbauth $HOME/.vnc/passwd
           echo "==== CONNECT INFO ===="
           echo "Tailscale IP: $TS_IP"
           echo "Port: 5901"
-          echo "User: $USER"
+          echo "Username: $CI_USER"
           echo "Password: $CI_PASS"
