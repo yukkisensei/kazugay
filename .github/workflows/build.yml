@@ -38,8 +38,22 @@ jobs:
             libxcb-randr0-dev libxcb-xinput-dev \
             libxcb-xinerama0-dev libxcb-xkb-dev \
             libpugixml-dev hwdata \
-            xwayland dbus-x11 openssl swaybg waybar xterm firefox \
+            xwayland dbus-x11 openssl swaybg waybar xterm \
             ccache
+
+      - name: Install Brave + Discord
+        run: |
+          # Brave
+          sudo curl -fsSLo /usr/share/keyrings/brave-browser-archive-keyring.gpg https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/brave-browser-archive-keyring.gpg] https://brave-browser-apt-release.s3.brave.com/ stable main" \
+            | sudo tee /etc/apt/sources.list.d/brave-browser-release.list
+          sudo apt-get update
+          sudo apt-get install -y brave-browser
+
+          # Discord (download latest .deb)
+          wget -O discord.deb "https://discord.com/api/download?platform=linux&format=deb"
+          sudo apt-get install -y ./discord.deb
+          rm -f discord.deb
 
       - name: Setup user
         run: |
