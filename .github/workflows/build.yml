@@ -61,7 +61,7 @@ jobs:
         run: |
           sudo -u yuu git clone --recursive https://github.com/hyprwm/Hyprland.git /home/yuu/Hyprland
           cd /home/yuu/Hyprland
-          CC="ccache clang-18" CXX="ccache clang++-18" sudo -u yuu meson setup --buildtype=release --prefix /usr build
+          sudo -u yuu env CC="ccache clang-18" CXX="ccache clang++-18" meson setup --buildtype=release --prefix /usr build
           sudo -u yuu ninja -C build -j$(nproc) -q
           sudo ninja -C build install -q
 
@@ -69,7 +69,7 @@ jobs:
         run: |
           sudo -u yuu git clone https://github.com/any1/wayvnc.git /home/yuu/wayvnc
           cd /home/yuu/wayvnc
-          CC="ccache clang-18" CXX="ccache clang++-18" sudo -u yuu meson setup build --prefix=/usr
+          sudo -u yuu env CC="ccache clang-18" CXX="ccache clang++-18" meson setup build --prefix=/usr
           sudo -u yuu ninja -C build -j$(nproc) -q
           sudo meson install -C build -q
 
