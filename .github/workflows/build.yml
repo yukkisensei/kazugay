@@ -54,17 +54,23 @@ jobs:
 
       - name: Install Brave + Discord
         run: |
-          # Brave
           sudo curl -fsSLo /usr/share/keyrings/brave-browser-archive-keyring.gpg https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg
           echo "deb [signed-by=/usr/share/keyrings/brave-browser-archive-keyring.gpg] https://brave-browser-apt-release.s3.brave.com/ stable main" \
             | sudo tee /etc/apt/sources.list.d/brave-browser-release.list >/dev/null
           sudo apt-get update -qq
           sudo apt-get install -y -qq brave-browser > /dev/null
 
-          # Discord
           wget -q -O discord.deb "https://discord.com/api/download?platform=linux&format=deb"
           sudo apt-get install -y -qq ./discord.deb > /dev/null
           rm -f discord.deb
+
+      - name: Install Clang 18
+        run: |
+          wget -q https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 18
+          echo "CC=ccache clang-18" >> $GITHUB_ENV
+          echo "CXX=ccache clang++-18" >> $GITHUB_ENV
 
       - name: Fake pkg-config entries
         run: |
