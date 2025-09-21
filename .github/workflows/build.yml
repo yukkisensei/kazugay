@@ -74,10 +74,9 @@ jobs:
 
       - name: Configure ccache
         run: |
+          mkdir -p ~/.ccache
           echo 'max_size = 2G' > ~/.ccache/ccache.conf
           echo 'compression = true' >> ~/.ccache/ccache.conf
-          export CC="ccache clang-18"
-          export CXX="ccache clang++-18"
           echo "CC=ccache clang-18" >> $GITHUB_ENV
           echo "CXX=ccache clang++-18" >> $GITHUB_ENV
 
