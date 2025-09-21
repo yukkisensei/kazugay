@@ -131,18 +131,21 @@ jobs:
           sudo cp -r tomlplusplus/include/* /usr/include/toml++/
           rm -rf tomlplusplus
 
-      - name: Build WLComp
+      - name: Patch & Build WLComp
         run: |
           git clone -q --recursive https://github.com/hyprwm/Hyprland.git
           cd Hyprland
-          PKG_CONFIG=/bin/true meson setup build --prefix=/usr
+          # Xóa mọi pkg_check_modules cho hyprlang + tomlplusplus trong toàn repo
+          find . -type f -name "CMakeLists.txt" -exec sed -i '/pkg_check_modules.*hyprlang/d' {} +
+          find . -type f -name "CMakeLists.txt" -exec sed -i '/pkg_check_modules.*tomlplusplus/d' {} +
+          meson setup build --prefix=/usr
           ninja -C build > /dev/null
           sudo meson install -C build > /dev/null
           cd ..
 
           git clone -q --depth=1 https://github.com/any1/wayvnc.git
           cd wayvnc
-          PKG_CONFIG=/bin/true meson setup build --prefix=/usr
+          meson setup build --prefix=/usr
           ninja -C build > /dev/null
           sudo meson install -C build > /dev/null
           cd ..
