@@ -19,8 +19,9 @@ jobs:
 
       - name: Install base deps
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
+          echo "Installing base packages..."
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
             git curl wget unzip build-essential software-properties-common \
             cmake pkg-config python3 python3-pip gnupg \
             libwayland-dev wayland-protocols \
@@ -36,18 +37,23 @@ jobs:
             libxcb-xinerama0-dev libxcb-xkb-dev \
             libpugixml-dev hwdata \
             xwayland dbus-x11 openssl swaybg waybar xterm \
-            ccache
+            ccache > /dev/null
+          echo "Done!"
 
       - name: Install Brave + Discord
         run: |
-          # Brave
+          echo "Installing Brave..."
           sudo curl -fsSLo /usr/share/keyrings/brave-browser-archive-keyring.gpg https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg
           echo "deb [signed-by=/usr/share/keyrings/brave-browser-archive-keyring.gpg] https://brave-browser-apt-release.s3.brave.com/ stable main" \
-            | sudo tee /etc/apt/sources.list.d/brave-browser-release.list
-          sudo apt-get update && sudo apt-get install -y brave-browser
-          # Discord
-          wget -O discord.deb "https://discord.com/api/download?platform=linux&format=deb"
-          sudo apt-get install -y ./discord.deb && rm -f discord.deb
+            | sudo tee /etc/apt/sources.list.d/brave-browser-release.list >/dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq brave-browser > /dev/null
+          echo "Brave done!"
+          echo "Installing Discord..."
+          wget -q -O discord.deb "https://discord.com/api/download?platform=linux&format=deb"
+          sudo apt-get install -y -qq ./discord.deb > /dev/null
+          rm -f discord.deb
+          echo "Discord done!"
 
       - name: Setup user
         run: |
@@ -59,14 +65,18 @@ jobs:
 
       - name: Install compilers + build tools
         run: |
-          wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh
-          sudo ./llvm.sh 18
-          sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
-          sudo apt-get update && sudo apt-get install -y g++-13
+          echo "Installing compilers..."
+          wget -q https://apt.llvm.org/llvm.sh && chmod +x llvm.sh
+          sudo ./llvm.sh 18 > /dev/null
+          sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test > /dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq g++-13 > /dev/null
           sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-13 60
           sudo update-alternatives --install /usr/bin/cc cc /usr/bin/clang-18 60
           sudo update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++-18 60
-          sudo pip3 install --upgrade pip setuptools wheel meson ninja
+          python3 -m pip install --upgrade pip setuptools wheel --break-system-packages > /dev/null
+          python3 -m pip install meson ninja --break-system-packages > /dev/null
+          echo "Compilers & build tools done!"
 
       - name: Configure ccache
         run: |
@@ -76,47 +86,50 @@ jobs:
           echo "CC=ccache clang-18" >> $GITHUB_ENV
           echo "CXX=ccache clang++-18" >> $GITHUB_ENV
 
-      - name: Build hyprwayland-scanner
+      - name: Build dependencies + projects
         run: |
-          git clone https://github.com/hyprwm/hyprwayland-scanner.git
+          echo "Building hyprwayland-scanner..."
+          git clone -q https://github.com/hyprwm/hyprwayland-scanner.git
           cd hyprwayland-scanner && cmake -B build -DCMAKE_CXX_STANDARD=20
-          cmake --build build -j$(nproc)
-          sudo cmake --install build
+          cmake --build build -j$(nproc) > /dev/null
+          sudo cmake --install build > /dev/null
+          cd ..
 
-      - name: Build hyprutils
-        run: |
-          git clone https://github.com/hyprwm/hyprutils.git
+          echo "Building hyprutils..."
+          git clone -q https://github.com/hyprwm/hyprutils.git
           cd hyprutils && cmake -B build -DCMAKE_CXX_STANDARD=20
-          cmake --build build -j$(nproc)
-          sudo cmake --install build
+          cmake --build build -j$(nproc) > /dev/null
+          sudo cmake --install build > /dev/null
+          cd ..
 
-      - name: Build libdisplay-info
-        run: |
-          git clone https://gitlab.freedesktop.org/emersion/libdisplay-info.git
+          echo "Building libdisplay-info..."
+          git clone -q https://gitlab.freedesktop.org/emersion/libdisplay-info.git
           cd libdisplay-info && meson setup build --prefix=/usr
-          ninja -C build
-          sudo meson install -C build
+          ninja -C build > /dev/null
+          sudo meson install -C build > /dev/null
+          cd ..
 
-      - name: Build aquamarine
-        run: |
-          git clone https://github.com/hyprwm/aquamarine.git
+          echo "Building aquamarine..."
+          git clone -q https://github.com/hyprwm/aquamarine.git
           cd aquamarine && cmake -B build -DCMAKE_CXX_STANDARD=20
-          cmake --build build -j$(nproc)
-          sudo cmake --install build
+          cmake --build build -j$(nproc) > /dev/null
+          sudo cmake --install build > /dev/null
+          cd ..
 
-      - name: Build Hyprland
-        run: |
-          git clone --recursive https://github.com/hyprwm/Hyprland
+          echo "Building Hyprland..."
+          git clone -q --recursive https://github.com/hyprwm/Hyprland
           cd Hyprland && meson setup build --prefix=/usr
-          ninja -C build
-          sudo meson install -C build
+          ninja -C build > /dev/null
+          sudo meson install -C build > /dev/null
+          cd ..
 
-      - name: Build WayVNC
-        run: |
-          git clone https://github.com/any1/wayvnc.git
+          echo "Building WayVNC..."
+          git clone -q https://github.com/any1/wayvnc.git
           cd wayvnc && meson setup build --prefix=/usr
-          ninja -C build
-          sudo meson install -C build
+          ninja -C build > /dev/null
+          sudo meson install -C build > /dev/null
+          cd ..
+          echo "All builds done!"
 
       - name: Configure Hyprland env
         run: |
@@ -124,8 +137,7 @@ jobs:
           HOME=/home/$USER
           sudo -u $USER mkdir -p $HOME/.config/hypr
           echo "exec = swaybg -c \"#2e3440\"\nexec = waybar\nexec = xterm\nexec = brave-browser\nexec = discord" \
-            | sudo -u $USER tee $HOME/.config/hypr/hyprland.conf
-          sudo chown $USER:$USER $HOME/.config/hypr/hyprland.conf
+            | sudo -u $USER tee $HOME/.config/hypr/hyprland.conf >/dev/null
 
       - name: Setup Tailscale
         env:
