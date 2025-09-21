@@ -52,18 +52,11 @@ jobs:
           sudo apt-get install -y -qq ./discord.deb || sudo apt-get install -f -y -qq
           rm -f discord.deb
 
+      # === Dependencies ===
       - name: Build libdisplay-info
         run: |
           sudo -u yuu git clone --recursive https://gitlab.freedesktop.org/emersion/libdisplay-info.git /home/yuu/libdisplay-info
           cd /home/yuu/libdisplay-info
-          sudo -u yuu meson setup build --prefix=/usr --buildtype=release
-          sudo -u yuu ninja -C build -j$(nproc)
-          sudo ninja -C build install
-
-      - name: Build hyprutils
-        run: |
-          sudo -u yuu git clone --recursive https://github.com/hyprwm/hyprutils.git /home/yuu/hyprutils
-          cd /home/yuu/hyprutils
           sudo -u yuu meson setup build --prefix=/usr --buildtype=release
           sudo -u yuu ninja -C build -j$(nproc)
           sudo ninja -C build install
@@ -75,6 +68,14 @@ jobs:
           sudo -u yuu meson setup build --prefix=/usr --buildtype=release
           sudo -u yuu ninja -C build -j$(nproc)
           sudo ninja -C build install
+
+      - name: Build hyprutils
+        run: |
+          sudo -u yuu git clone --recursive https://github.com/hyprwm/hyprutils.git /home/yuu/hyprutils
+          cd /home/yuu/hyprutils
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
+          cmake --build build -j$(nproc)
+          sudo cmake --install build
 
       - name: Build hyprwayland-scanner
         run: |
@@ -92,6 +93,7 @@ jobs:
           cmake --build build -j$(nproc)
           sudo cmake --install build
 
+      # === Hyprland + WayVNC ===
       - name: Build Hyprland
         run: |
           sudo -u yuu git clone --recursive https://github.com/hyprwm/Hyprland.git /home/yuu/Hyprland
@@ -108,6 +110,7 @@ jobs:
           sudo -u yuu ninja -C build -j$(nproc) -q
           sudo meson install -C build -q
 
+      # === Networking ===
       - name: Setup Tailscale
         env:
           TAILSCALE_AUTH_KEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
