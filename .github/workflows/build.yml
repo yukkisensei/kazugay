@@ -6,7 +6,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-24.04
-    timeout-minutes: 360   # max cho phép: 6 giờ
+    timeout-minutes: 360
 
     steps:
       - uses: actions/checkout@v4
@@ -57,13 +57,18 @@ jobs:
           sudo apt-get install -y -qq ./discord.deb || sudo apt-get install -f -y -qq
           rm -f discord.deb
 
+      - name: Build Aquamarine
+        run: |
+          sudo -u yuu git clone --recursive https://github.com/hyprwm/aquamarine.git /home/yuu/aquamarine
+          cd /home/yuu/aquamarine
+          sudo -u yuu env CC="ccache clang-18" CXX="ccache clang++-18" meson setup --buildtype=release --prefix /usr build
+          sudo -u yuu ninja -C build -j$(nproc) -q
+          sudo ninja -C build install -q
+
       - name: Build Hyprland
         run: |
           sudo -u yuu git clone --recursive https://github.com/hyprwm/Hyprland.git /home/yuu/Hyprland
           cd /home/yuu/Hyprland
-          # fix: clone Aquamarine dependency
-          sudo -u yuu git clone --recursive https://github.com/hyprwm/aquamarine.git subprojects/aquamarine
-          # build Hyprland with clang-18
           sudo -u yuu env CC="ccache clang-18" CXX="ccache clang++-18" meson setup --buildtype=release --prefix /usr build
           sudo -u yuu ninja -C build -j$(nproc) -q
           sudo ninja -C build install -q
