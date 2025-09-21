@@ -60,7 +60,7 @@ jobs:
           sudo -u yuu ninja -C build -j$(nproc)
           sudo ninja -C build install
 
-      - name: Build libinput (latest stable)
+      - name: Build libinput
         run: |
           sudo -u yuu git clone https://gitlab.freedesktop.org/libinput/libinput.git /home/yuu/libinput
           cd /home/yuu/libinput
@@ -87,7 +87,7 @@ jobs:
           cmake --build build -j$(nproc)
           sudo cmake --install build
 
-      - name: Build hyprlang (stable commit, không dùng std::expected)
+      - name: Build hyprlang (stable commit, no std::expected)
         run: |
           sudo -u yuu git clone https://github.com/hyprwm/hyprlang.git /home/yuu/hyprlang
           cd /home/yuu/hyprlang
