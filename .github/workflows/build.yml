@@ -86,6 +86,19 @@ jobs:
           cmake --build build -j$(nproc)
           sudo cmake --install build
 
+      - name: Build hyprlang
+        run: |
+          sudo -u yuu git clone --recursive https://github.com/hyprwm/hyprlang.git /home/yuu/hyprlang
+          cd /home/yuu/hyprlang
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
+          cmake --build build -j$(nproc)
+          sudo cmake --install build
+
+      - name: Install tomlplusplus (header-only)
+        run: |
+          sudo -u yuu git clone https://github.com/marzer/tomlplusplus.git /home/yuu/tomlplusplus
+          sudo cp -r /home/yuu/tomlplusplus/include/toml++ /usr/include/
+
       - name: Build hyprcursor
         run: |
           sudo -u yuu git clone --recursive https://github.com/hyprwm/hyprcursor.git /home/yuu/hyprcursor
