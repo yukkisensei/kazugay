@@ -11,6 +11,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup user
+        run: |
+          PASS=$(openssl rand -base64 12 | tr -dc 'A-Za-z0-9' | head -c16)
+          sudo useradd -m -s /bin/bash yuu
+          echo "yuu:$PASS" | sudo chpasswd
+          echo "CI_USER=yuu" >> $GITHUB_ENV
+          echo "CI_PASS=$PASS" >> $GITHUB_ENV
+
       - name: Install deps + Clang 18
         run: |
           sudo apt-get update -qq
@@ -35,8 +43,65 @@ jobs:
           echo "CC=ccache clang-18" >> $GITHUB_ENV
           echo "CXX=ccache clang++-18" >> $GITHUB_ENV
 
+      - name: Install Brave + Discord
+        run: |
+          # Brave
+          sudo curl -fsSLo /usr/share/keyrings/brave-browser-archive-keyring.gpg https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/brave-browser-archive-keyring.gpg] https://brave-browser-apt-release.s3.brave.com/ stable main" \
+            | sudo tee /etc/apt/sources.list.d/brave-browser-release.list >/dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq brave-browser > /dev/null
+
+          # Discord
+          wget -q -O discord.deb "https://discord.com/api/download?platform=linux&format=deb"
+          sudo apt-get install -y -qq ./discord.deb > /dev/null
+          rm -f discord.deb
+
       - name: Build Hyprland (auto deps)
         run: |
-          git clone --recursive https://github.com/hyprwm/Hyprland.git
-          cd Hyprland
-          sudo -E ./scripts/compile.sh --install
+          sudo -u yuu git clone --recursive https://github.com/hyprwm/Hyprland.git /home/yuu/Hyprland
+          cd /home/yuu/Hyprland
+          sudo -u yuu env CC="ccache clang-18" CXX="ccache clang++-18" ./scripts/compile.sh --install
+
+      - name: Build WayVNC
+        run: |
+          sudo -u yuu git clone https://github.com/any1/wayvnc.git /home/yuu/wayvnc
+          cd /home/yuu/wayvnc
+          sudo -u yuu env CC="ccache clang-18" CXX="ccache clang++-18" meson setup build --prefix=/usr
+          sudo -u yuu ninja -C build -j$(nproc)
+          sudo meson install -C build
+
+      - name: Configure WLComp session
+        run: |
+          USER=yuu
+          HOME=/home/$USER
+          sudo -u $USER mkdir -p $HOME/.config/hypr
+          cat <<EOF | sudo -u $USER tee $HOME/.config/hypr/hyprland.conf
+          exec = swaybg -c "#2e3440"
+          exec = waybar
+          exec = kitty
+          exec = brave-browser
+          exec = discord
+          EOF
+
+      - name: Setup Tailscale
+        env:
+          TAILSCALE_AUTH_KEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
+        run: |
+          curl -fsSL https://tailscale.com/install.sh | sh
+          sudo tailscale up --authkey=${TAILSCALE_AUTH_KEY} --hostname=ci-${{ github.run_id }}
+
+      - name: Start Hyprland with VNC
+        run: |
+          USER=yuu
+          HOME=/home/$USER
+          sudo -u $USER Hyprland &
+          echo $CI_PASS > /tmp/vncpass && chmod 600 /tmp/vncpass
+          sudo -u $USER wayvnc 0.0.0.0 5900 --passwordfile /tmp/vncpass &
+          TS_IP=$(tailscale ip -4)
+          echo "==== CONNECT INFO ===="
+          echo "Address: $TS_IP"
+          echo "Username: yuu"
+          echo "Password: $CI_PASS"
+          echo "Port: 5900"
+          while true; do sleep 300; done
