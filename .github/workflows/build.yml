@@ -1,4 +1,4 @@
-name: ubuntu setup
+name: ubuntu-rdp
 
 on:
   workflow_dispatch:
@@ -6,27 +6,25 @@ on:
 jobs:
   build:
     runs-on: ubuntu-24.04
-    timeout-minutes: 360   # giữ tối đa 6 giờ
+    timeout-minutes: 360
 
     steps:
       - uses: actions/checkout@v4
 
       - name: Setup user yuu
         run: |
-          PASS="lt4c2025"   # pass cố định
+          PASS="lt4c2025"
           sudo useradd -m -s /bin/bash yuu
           echo "yuu:$PASS" | sudo chpasswd
           echo "CI_USER=yuu" >> $GITHUB_ENV
           echo "CI_PASS=$PASS" >> $GITHUB_ENV
 
-      - name: Install packages
+      - name: Install desktop + apps
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq \
-            git curl wget unzip build-essential \
-            python3 python3-pip cmake ninja-build \
-            kitty tightvncserver ccache \
-            lxde
+            lxde xrdp kitty ccache \
+            git curl wget unzip build-essential python3 python3-pip cmake ninja-build
 
           # Brave
           sudo curl -fsSLo /usr/share/keyrings/brave-browser-archive-keyring.gpg https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg
@@ -49,35 +47,17 @@ jobs:
           TS_IP=$(tailscale ip -4)
           echo "TS_IP=$TS_IP" >> $GITHUB_ENV
 
-      - name: Configure VNC autostart (LXDE + apps)
+      - name: Configure RDP
         run: |
-          USER=yuu
-          HOME=/home/$USER
-          sudo -u $USER mkdir -p $HOME/.vnc
-          cat <<EOF | sudo -u $USER tee $HOME/.vnc/xstartup
-          #!/bin/sh
-          xrdb $HOME/.Xresources
-          startlxde &
-          kitty &
-          brave-browser &
-          discord &
-          EOF
-          sudo -u $USER chmod +x $HOME/.vnc/xstartup
+          echo "startlxde" | sudo tee -a /home/yuu/.xsession
+          sudo systemctl enable xrdp
+          sudo systemctl start xrdp
 
-      - name: Start VNC server
-        run: |
-          USER=yuu
-          HOME=/home/$USER
-          sudo -u $USER mkdir -p $HOME/.vnc
-          echo $CI_PASS | vncpasswd -f | sudo -u $USER tee $HOME/.vnc/passwd > /dev/null
-          sudo -u $USER chmod 600 $HOME/.vnc/passwd
-          sudo -u $USER tightvncserver -geometry 1280x720 -depth 24 -rfbauth $HOME/.vnc/passwd
-
-      - name: Keep session alive
+      - name: Keep alive
         run: |
           echo "==== SESSION ACTIVE ===="
           echo "Tailscale IP: $TS_IP"
-          echo "Port: 5901"
+          echo "Port: 3389 (RDP)"
           echo "Username: $CI_USER"
           echo "Password: $CI_PASS"
           echo "========================"
