@@ -53,7 +53,7 @@ jobs:
           sudo apt-get install -y -qq ./discord.deb || sudo apt-get install -f -y -qq
           rm -f discord.deb
 
-      # === Deps ===
+      # === Dependencies ===
       - name: Build libdisplay-info
         run: |
           sudo -u yuu git clone --recursive https://gitlab.freedesktop.org/emersion/libdisplay-info.git /home/yuu/libdisplay-info
@@ -94,10 +94,18 @@ jobs:
           cmake --build build -j$(nproc)
           sudo cmake --install build
 
-      - name: Install tomlplusplus (header-only)
+      - name: Install tomlplusplus (header-only with pkg-config)
         run: |
           sudo -u yuu git clone https://github.com/marzer/tomlplusplus.git /home/yuu/tomlplusplus
           sudo cp -r /home/yuu/tomlplusplus/include/toml++ /usr/include/
+          # tạo pkg-config file cho toml++
+          echo "prefix=/usr
+includedir=\${prefix}/include
+
+Name: tomlplusplus
+Description: TOML++ (header-only TOML parser for C++17/20/23)
+Version: 3.4.0
+Cflags: -I\${includedir}/toml++" | sudo tee /usr/lib/pkgconfig/tomlplusplus.pc
 
       - name: Build hyprcursor
         run: |
