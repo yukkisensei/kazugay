@@ -42,7 +42,7 @@ jobs:
 
       - name: Build input stack
         run: |
-          git clone -q https://gitlab.freedesktop.org/libinput/libinput.git || (sleep 5 && git clone -q https://gitlab.freedesktop.org/libinput/libinput.git)
+          git clone -q https://gitlab.freedesktop.org/libinput/libinput.git
           cd libinput
           meson setup build --prefix=/usr
           ninja -C build > /dev/null
@@ -135,9 +135,9 @@ jobs:
         run: |
           git clone -q --recursive --depth=1 https://github.com/hyprwm/Hyprland.git
           cd Hyprland
-          # Patch out pkg_check_modules for hyprlang & tomlplusplus
-          sed -i '/pkg_check_modules.*hyprlang/d' CMakeLists.txt || true
-          sed -i '/pkg_check_modules.*tomlplusplus/d' CMakeLists.txt || true
+          # Patch all CMakeLists to remove pkg_check_modules hyprlang/tomlplusplus
+          grep -rl "pkg_check_modules" . | xargs sed -i '/hyprlang/d'
+          grep -rl "pkg_check_modules" . | xargs sed -i '/tomlplusplus/d'
           meson setup build --prefix=/usr
           ninja -C build > /dev/null
           sudo meson install -C build > /dev/null
