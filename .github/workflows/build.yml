@@ -19,7 +19,7 @@ jobs:
           echo "CI_USER=yuu" >> $GITHUB_ENV
           echo "CI_PASS=$PASS" >> $GITHUB_ENV
 
-      - name: Install deps + Clang 19 + libc++
+      - name: Install deps + Clang 19
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq \
@@ -31,7 +31,6 @@ jobs:
             libgbm-dev libudev-dev libevdev-dev libmtdev-dev \
             libluajit-5.1-dev libwacom-dev libgtk-3-dev libzip-dev librsvg2-dev \
             libpugixml-dev \
-            libc++-19-dev libc++abi-19-dev \
             ccache
 
           wget -q https://apt.llvm.org/llvm.sh
@@ -51,55 +50,49 @@ jobs:
           sudo apt-get install -y -qq ./discord.deb || sudo apt-get install -f -y -qq
           rm -f discord.deb
 
-      # === Dependencies ===
+      # === Dependencies (locked commits) ===
       - name: Build libdisplay-info
         run: |
-          sudo -u yuu git clone --recursive https://gitlab.freedesktop.org/emersion/libdisplay-info.git /home/yuu/libdisplay-info
+          sudo -u yuu git clone https://gitlab.freedesktop.org/emersion/libdisplay-info.git /home/yuu/libdisplay-info
           cd /home/yuu/libdisplay-info
+          git checkout 8d6d7c3
           sudo -u yuu meson setup build --prefix=/usr --buildtype=release
           sudo -u yuu ninja -C build -j$(nproc)
           sudo ninja -C build install
 
-      - name: Build libinput (latest)
+      - name: Build libinput (latest stable)
         run: |
           sudo -u yuu git clone https://gitlab.freedesktop.org/libinput/libinput.git /home/yuu/libinput
           cd /home/yuu/libinput
+          git checkout 6a8d5a2
           sudo -u yuu meson setup build --prefix=/usr --buildtype=release
           sudo -u yuu ninja -C build -j$(nproc)
           sudo ninja -C build install
 
       - name: Build hyprutils
         run: |
-          sudo -u yuu git clone --recursive https://github.com/hyprwm/hyprutils.git /home/yuu/hyprutils
+          sudo -u yuu git clone https://github.com/hyprwm/hyprutils.git /home/yuu/hyprutils
           cd /home/yuu/hyprutils
-          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr \
-            -DCMAKE_CXX_STANDARD=23 \
-            -DCMAKE_CXX_FLAGS="-stdlib=libc++ -isystem /usr/include/c++/v1" \
-            -DCMAKE_EXE_LINKER_FLAGS="-lc++ -lc++abi"
+          git checkout f9c4c6c
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_CXX_STANDARD=20
           cmake --build build -j$(nproc)
           sudo cmake --install build
 
       - name: Build hyprwayland-scanner
         run: |
-          sudo -u yuu git clone --recursive https://github.com/hyprwm/hyprwayland-scanner.git /home/yuu/hyprwayland-scanner
+          sudo -u yuu git clone https://github.com/hyprwm/hyprwayland-scanner.git /home/yuu/hyprwayland-scanner
           cd /home/yuu/hyprwayland-scanner
-          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr \
-            -DCMAKE_CXX_STANDARD=23 \
-            -DCMAKE_CXX_FLAGS="-stdlib=libc++ -isystem /usr/include/c++/v1" \
-            -DCMAKE_EXE_LINKER_FLAGS="-lc++ -lc++abi"
+          git checkout a2d0df8
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_CXX_STANDARD=20
           cmake --build build -j$(nproc)
           sudo cmake --install build
 
-      - name: Build hyprlang (stable commit)
+      - name: Build hyprlang (stable commit, không dùng std::expected)
         run: |
-          sudo -u yuu git clone --recursive https://github.com/hyprwm/hyprlang.git /home/yuu/hyprlang
+          sudo -u yuu git clone https://github.com/hyprwm/hyprlang.git /home/yuu/hyprlang
           cd /home/yuu/hyprlang
-          # checkout commit trước khi dùng std::expected
           git checkout 5b39d52
-          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr \
-            -DCMAKE_CXX_STANDARD=20 \
-            -DCMAKE_CXX_FLAGS="-stdlib=libc++ -isystem /usr/include/c++/v1" \
-            -DCMAKE_EXE_LINKER_FLAGS="-lc++ -lc++abi"
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_CXX_STANDARD=20
           cmake --build build -j$(nproc)
           sudo cmake --install build
 
@@ -117,31 +110,28 @@ Cflags: -I\${includedir}/toml++" | sudo tee /usr/lib/pkgconfig/tomlplusplus.pc
 
       - name: Build hyprcursor
         run: |
-          sudo -u yuu git clone --recursive https://github.com/hyprwm/hyprcursor.git /home/yuu/hyprcursor
+          sudo -u yuu git clone https://github.com/hyprwm/hyprcursor.git /home/yuu/hyprcursor
           cd /home/yuu/hyprcursor
-          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr \
-            -DCMAKE_CXX_STANDARD=23 \
-            -DCMAKE_CXX_FLAGS="-stdlib=libc++ -isystem /usr/include/c++/v1" \
-            -DCMAKE_EXE_LINKER_FLAGS="-lc++ -lc++abi"
+          git checkout 3ce0a7a
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_CXX_STANDARD=20
           cmake --build build -j$(nproc)
           sudo cmake --install build
 
       - name: Build Aquamarine
         run: |
-          sudo -u yuu git clone --recursive https://github.com/hyprwm/aquamarine.git /home/yuu/aquamarine
+          sudo -u yuu git clone https://github.com/hyprwm/aquamarine.git /home/yuu/aquamarine
           cd /home/yuu/aquamarine
-          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr \
-            -DCMAKE_CXX_STANDARD=23 \
-            -DCMAKE_CXX_FLAGS="-stdlib=libc++ -isystem /usr/include/c++/v1" \
-            -DCMAKE_EXE_LINKER_FLAGS="-lc++ -lc++abi"
+          git checkout 3d9911f
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_CXX_STANDARD=20
           cmake --build build -j$(nproc)
           sudo cmake --install build
 
       # === Hyprland + WayVNC ===
       - name: Build Hyprland
         run: |
-          sudo -u yuu git clone --recursive https://github.com/hyprwm/Hyprland.git /home/yuu/Hyprland
+          sudo -u yuu git clone https://github.com/hyprwm/Hyprland.git /home/yuu/Hyprland
           cd /home/yuu/Hyprland
+          git checkout f7a91bc
           sudo -u yuu env CC="ccache clang-19" CXX="ccache clang++-19" meson setup --buildtype=release --prefix /usr build
           sudo -u yuu ninja -C build -j$(nproc) -q
           sudo ninja -C build install -q
@@ -150,7 +140,7 @@ Cflags: -I\${includedir}/toml++" | sudo tee /usr/lib/pkgconfig/tomlplusplus.pc
         run: |
           sudo -u yuu git clone https://github.com/any1/wayvnc.git /home/yuu/wayvnc
           cd /home/yuu/wayvnc
-          sudo -u yuu env CC="ccache clang-19" CXX="ccache clang++-19" meson setup build --prefix=/usr
+          sudo -u yuu meson setup build --prefix=/usr
           sudo -u yuu ninja -C build -j$(nproc) -q
           sudo meson install -C build -q
 
