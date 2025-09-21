@@ -90,12 +90,14 @@ jobs:
           cmake --build build -j$(nproc)
           sudo cmake --install build
 
-      - name: Build hyprlang
+      - name: Build hyprlang (stable commit)
         run: |
           sudo -u yuu git clone --recursive https://github.com/hyprwm/hyprlang.git /home/yuu/hyprlang
           cd /home/yuu/hyprlang
+          # checkout commit trước khi dùng std::expected
+          git checkout 5b39d52
           cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr \
-            -DCMAKE_CXX_STANDARD=23 \
+            -DCMAKE_CXX_STANDARD=20 \
             -DCMAKE_CXX_FLAGS="-stdlib=libc++ -isystem /usr/include/c++/v1" \
             -DCMAKE_EXE_LINKER_FLAGS="-lc++ -lc++abi"
           cmake --build build -j$(nproc)
