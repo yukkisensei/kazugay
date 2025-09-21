@@ -131,15 +131,12 @@ jobs:
           sudo cp -r tomlplusplus/include/* /usr/include/toml++/
           rm -rf tomlplusplus
 
-      - name: Clone WLComp
+      - name: Patch WLComp
         run: |
           git clone -q --recursive --depth=1 https://github.com/hyprwm/Hyprland.git
-
-      - name: Patch WLComp CMakeLists
-        run: |
           cd Hyprland
-          find . -name "CMakeLists.txt" -exec sed -i '/pkg_check_modules.*hyprlang/d' {} +
-          find . -name "CMakeLists.txt" -exec sed -i '/pkg_check_modules.*tomlplusplus/d' {} +
+          find . -name "CMakeLists.txt" -exec sed -i '/pkg_check_modules.*hyprlang/d' {} + || true
+          find . -name "CMakeLists.txt" -exec sed -i '/pkg_check_modules.*tomlplusplus/d' {} + || true
 
       - name: Build WLComp
         run: |
