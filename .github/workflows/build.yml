@@ -61,9 +61,9 @@ jobs:
         run: |
           sudo -u yuu git clone --recursive https://github.com/hyprwm/aquamarine.git /home/yuu/aquamarine
           cd /home/yuu/aquamarine
-          sudo -u yuu env CC="ccache clang-18" CXX="ccache clang++-18" meson setup --buildtype=release --prefix /usr build
-          sudo -u yuu ninja -C build -j$(nproc) -q
-          sudo ninja -C build install -q
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
+          cmake --build build -j$(nproc)
+          sudo cmake --install build
 
       - name: Build Hyprland
         run: |
