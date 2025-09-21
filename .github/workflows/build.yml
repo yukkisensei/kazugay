@@ -1,4 +1,4 @@
-name: yukki Ci
+name: yukki Ci test
 
 on:
   workflow_dispatch:
@@ -24,7 +24,6 @@ jobs:
           echo "yuu:$PASS" | sudo chpasswd
           echo "CI_USER=yuu" >> $GITHUB_ENV
           echo "CI_PASS=$PASS" >> $GITHUB_ENV
-
           sudo mkdir -p /home/yuu/work
           sudo cp -r $GITHUB_WORKSPACE /home/yuu/work/repo
           sudo chown -R yuu:yuu /home/yuu/work
@@ -59,7 +58,6 @@ jobs:
             | sudo tee /etc/apt/sources.list.d/brave-browser-release.list >/dev/null
           sudo apt-get update -qq
           sudo apt-get install -y -qq brave-browser > /dev/null
-
           wget -q -O discord.deb "https://discord.com/api/download?platform=linux&format=deb"
           sudo apt-get install -y -qq ./discord.deb > /dev/null
           rm -f discord.deb
@@ -84,7 +82,6 @@ jobs:
           Cflags: -I\${includedir}
           Libs: -L\${libdir} -lhyprlang
           EOF
-
           cat <<EOF | sudo tee /usr/lib/x86_64-linux-gnu/pkgconfig/tomlplusplus.pc
           prefix=/usr
           includedir=\${prefix}/include
@@ -95,28 +92,33 @@ jobs:
           Libs:
           EOF
           
-      # STEP MỚI ĐƯỢC THÊM VÀO ĐÂY
       - name: Build and Install Aquamarine
         run: |
           sudo -u yuu HOME=/home/yuu git clone -q https://github.com/hyprwm/aquamarine.git /home/yuu/work/aquamarine
-          cd /home/yuu/work/aquamarine
-          sudo -u yuu HOME=/home/yuu env CC="ccache clang-18" CXX="ccache clang++-18" meson setup build --prefix=/usr
-          sudo -u yuu HOME=/home/yuu ninja -C build -j$(nproc)
-          sudo meson install -C build
+          sudo -u yuu HOME=/home/yuu bash -c ' \
+            cd /home/yuu/work/aquamarine && \
+            env CC="ccache clang-18" CXX="ccache clang++-18" meson setup build --prefix=/usr && \
+            ninja -C build -j$(nproc) \
+          '
+          sudo meson install -C /home/yuu/work/aquamarine/build
 
       - name: Build Hyprland + WayVNC
         run: |
           sudo -u yuu HOME=/home/yuu git clone -q --recursive https://github.com/hyprwm/Hyprland.git /home/yuu/work/Hyprland
-          cd /home/yuu/work/Hyprland
-          sudo -u yuu HOME=/home/yuu env CC="ccache clang-18" CXX="ccache clang++-18" meson setup build --prefix=/usr
-          sudo -u yuu HOME=/home/yuu ninja -C build -j$(nproc)
-          sudo meson install -C build
+          sudo -u yuu HOME=/home/yuu bash -c ' \
+            cd /home/yuu/work/Hyprland && \
+            env CC="ccache clang-18" CXX="ccache clang++-18" meson setup build --prefix=/usr && \
+            ninja -C build -j$(nproc) \
+          '
+          sudo meson install -C /home/yuu/work/Hyprland/build
 
           sudo -u yuu HOME=/home/yuu git clone -q --depth=1 https://github.com/any1/wayvnc.git /home/yuu/work/wayvnc
-          cd /home/yuu/work/wayvnc
-          sudo -u yuu HOME=/home/yuu env CC="ccache clang-18" CXX="ccache clang++-18" meson setup build --prefix=/usr
-          sudo -u yuu HOME=/home/yuu ninja -C build -j$(nproc)
-          sudo meson install -C build
+          sudo -u yuu HOME=/home/yuu bash -c ' \
+            cd /home/yuu/work/wayvnc && \
+            env CC="ccache clang-18" CXX="ccache clang++-18" meson setup build --prefix=/usr && \
+            ninja -C build -j$(nproc) \
+          '
+          sudo meson install -C /home/yuu/work/wayvnc/build
 
       - name: Configure WLComp session
         run: |
