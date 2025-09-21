@@ -27,11 +27,6 @@ jobs:
             cmake pkg-config python3 python3-pip gnupg meson ninja-build \
             libwayland-dev wayland-protocols libxkbcommon-dev libseat-dev \
             libdrm-dev libgles2-mesa-dev libpixman-1-dev libvulkan-dev \
-            libxcb1-dev libxcb-composite0-dev libxcb-xfixes0-dev \
-            libxcb-render0-dev libxcb-icccm4-dev libxcb-image0-dev \
-            libxcb-util-dev libxcb-ewmh-dev libxcb-present-dev \
-            libxcb-damage0-dev libxcb-randr0-dev libxcb-xinput-dev \
-            libxcb-xinerama0-dev libxcb-xkb-dev libpugixml-dev hwdata \
             xwayland dbus-x11 openssl swaybg waybar kitty weston \
             libgbm-dev libudev-dev libevdev-dev libmtdev-dev \
             libluajit-5.1-dev libwacom-dev libgtk-3-dev libzip-dev librsvg2-dev \
@@ -56,6 +51,30 @@ jobs:
           wget -q -O discord.deb "https://discord.com/api/download?platform=linux&format=deb"
           sudo apt-get install -y -qq ./discord.deb || sudo apt-get install -f -y -qq
           rm -f discord.deb
+
+      - name: Build libdisplay-info
+        run: |
+          git clone --recursive https://gitlab.freedesktop.org/emersion/libdisplay-info.git /home/yuu/libdisplay-info
+          cd /home/yuu/libdisplay-info
+          meson setup build --prefix=/usr --buildtype=release
+          ninja -C build -j$(nproc)
+          sudo ninja -C build install
+
+      - name: Build hyprutils
+        run: |
+          git clone --recursive https://github.com/hyprwm/hyprutils.git /home/yuu/hyprutils
+          cd /home/yuu/hyprutils
+          meson setup build --prefix=/usr --buildtype=release
+          ninja -C build -j$(nproc)
+          sudo ninja -C build install
+
+      - name: Build libinput (latest)
+        run: |
+          git clone https://gitlab.freedesktop.org/libinput/libinput.git /home/yuu/libinput
+          cd /home/yuu/libinput
+          meson setup build --prefix=/usr --buildtype=release
+          ninja -C build -j$(nproc)
+          sudo ninja -C build install
 
       - name: Build hyprwayland-scanner
         run: |
