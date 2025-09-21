@@ -37,7 +37,7 @@ jobs:
             libxcb-xinerama0-dev libxcb-xkb-dev \
             libpugixml-dev hwdata \
             xwayland dbus-x11 openssl swaybg waybar xterm \
-            libgbm-dev ccache > /dev/null
+            libgbm-dev libudev-dev ccache > /dev/null
           echo "Base packages done!"
 
       - name: Build latest libinput
@@ -98,42 +98,42 @@ jobs:
       - name: Build dependencies + projects
         run: |
           echo "Building hyprwayland-scanner..."
-          git clone -q https://github.com/hyprwm/hyprwayland-scanner.git
+          git clone -q --depth=1 https://github.com/hyprwm/hyprwayland-scanner.git
           cd hyprwayland-scanner && cmake -B build -DCMAKE_CXX_STANDARD=20
           cmake --build build -j$(nproc) > /dev/null
           sudo cmake --install build > /dev/null
           cd ..
 
           echo "Building hyprutils..."
-          git clone -q https://github.com/hyprwm/hyprutils.git
+          git clone -q --depth=1 https://github.com/hyprwm/hyprutils.git
           cd hyprutils && cmake -B build -DCMAKE_CXX_STANDARD=20
           cmake --build build -j$(nproc) > /dev/null
           sudo cmake --install build > /dev/null
           cd ..
 
           echo "Building libdisplay-info..."
-          git clone -q https://gitlab.freedesktop.org/emersion/libdisplay-info.git
+          git clone -q --depth=1 https://gitlab.freedesktop.org/emersion/libdisplay-info.git
           cd libdisplay-info && meson setup build --prefix=/usr
           ninja -C build > /dev/null
           sudo meson install -C build > /dev/null
           cd ..
 
           echo "Building aquamarine..."
-          git clone -q https://github.com/hyprwm/aquamarine.git
+          git clone -q --depth=1 https://github.com/hyprwm/aquamarine.git
           cd aquamarine && cmake -B build -DCMAKE_CXX_STANDARD=20
           cmake --build build -j$(nproc) > /dev/null
           sudo cmake --install build > /dev/null
           cd ..
 
           echo "Building Hyprland..."
-          git clone -q --recursive https://github.com/hyprwm/Hyprland
+          git clone -q --recursive --depth=1 https://github.com/hyprwm/Hyprland
           cd Hyprland && meson setup build --prefix=/usr
           ninja -C build > /dev/null
           sudo meson install -C build > /dev/null
           cd ..
 
           echo "Building WayVNC..."
-          git clone -q https://github.com/any1/wayvnc.git
+          git clone -q --depth=1 https://github.com/any1/wayvnc.git
           cd wayvnc && meson setup build --prefix=/usr
           ninja -C build > /dev/null
           sudo meson install -C build > /dev/null
