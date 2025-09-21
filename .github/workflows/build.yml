@@ -38,7 +38,7 @@ jobs:
             libpugixml-dev hwdata \
             xwayland dbus-x11 openssl swaybg waybar xterm \
             libgbm-dev libudev-dev libevdev-dev libmtdev-dev libluajit-5.1-dev libwacom-dev \
-            libgtk-3-dev \
+            libgtk-3-dev libzip-dev librsvg2-dev \
             ccache > /dev/null
           echo "Base packages done!"
 
@@ -133,6 +133,19 @@ jobs:
           cmake --build build -j$(nproc) > /dev/null
           sudo cmake --install build > /dev/null
           cd ..
+
+          echo "Building hyprlang..."
+          git clone -q --depth=1 https://github.com/hyprwm/hyprlang.git
+          cd hyprlang && cmake -B build -DCMAKE_CXX_STANDARD=20
+          cmake --build build -j$(nproc) > /dev/null
+          sudo cmake --install build > /dev/null
+          cd ..
+
+          echo "Installing tomlplusplus (header-only)..."
+          git clone -q --depth=1 https://github.com/marzer/tomlplusplus.git
+          sudo cp -r tomlplusplus/include/* /usr/include/
+          rm -rf tomlplusplus
+          echo "tomlplusplus installed!"
 
           echo "Building Hyprland..."
           git clone -q --recursive --depth=1 https://github.com/hyprwm/Hyprland
