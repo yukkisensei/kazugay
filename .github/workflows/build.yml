@@ -37,7 +37,7 @@ jobs:
             libxcb-xinerama0-dev libxcb-xkb-dev \
             libpugixml-dev hwdata \
             xwayland dbus-x11 openssl swaybg waybar xterm \
-            libgbm-dev libudev-dev libevdev-dev libmtdev-dev libluajit-5.1-dev \
+            libgbm-dev libudev-dev libevdev-dev libmtdev-dev libluajit-5.1-dev libwacom-dev \
             ccache > /dev/null
           echo "Base packages done!"
 
