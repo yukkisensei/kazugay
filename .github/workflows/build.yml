@@ -42,14 +42,11 @@ jobs:
 
       - name: Install Brave + Discord
         run: |
-          # Brave
           sudo curl -fsSLo /usr/share/keyrings/brave-browser-archive-keyring.gpg https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg
           echo "deb [signed-by=/usr/share/keyrings/brave-browser-archive-keyring.gpg] https://brave-browser-apt-release.s3.brave.com/ stable main" \
             | sudo tee /etc/apt/sources.list.d/brave-browser-release.list >/dev/null
           sudo apt-get update -qq
           sudo apt-get install -y -qq brave-browser
-
-          # Discord
           wget -q -O discord.deb "https://discord.com/api/download?platform=linux&format=deb"
           sudo apt-get install -y -qq ./discord.deb || sudo apt-get install -f -y -qq
           rm -f discord.deb
@@ -76,7 +73,9 @@ jobs:
           sudo -u yuu git clone --recursive https://github.com/hyprwm/hyprutils.git /home/yuu/hyprutils
           cd /home/yuu/hyprutils
           cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr \
-            -DCMAKE_CXX_STANDARD=23 -DCMAKE_CXX_FLAGS="-stdlib=libc++"
+            -DCMAKE_CXX_STANDARD=23 \
+            -DCMAKE_CXX_FLAGS="-stdlib=libc++ -isystem /usr/include/c++/v1" \
+            -DCMAKE_EXE_LINKER_FLAGS="-lc++ -lc++abi"
           cmake --build build -j$(nproc)
           sudo cmake --install build
 
@@ -85,7 +84,9 @@ jobs:
           sudo -u yuu git clone --recursive https://github.com/hyprwm/hyprwayland-scanner.git /home/yuu/hyprwayland-scanner
           cd /home/yuu/hyprwayland-scanner
           cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr \
-            -DCMAKE_CXX_STANDARD=23 -DCMAKE_CXX_FLAGS="-stdlib=libc++"
+            -DCMAKE_CXX_STANDARD=23 \
+            -DCMAKE_CXX_FLAGS="-stdlib=libc++ -isystem /usr/include/c++/v1" \
+            -DCMAKE_EXE_LINKER_FLAGS="-lc++ -lc++abi"
           cmake --build build -j$(nproc)
           sudo cmake --install build
 
@@ -94,7 +95,9 @@ jobs:
           sudo -u yuu git clone --recursive https://github.com/hyprwm/hyprlang.git /home/yuu/hyprlang
           cd /home/yuu/hyprlang
           cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr \
-            -DCMAKE_CXX_STANDARD=23 -DCMAKE_CXX_FLAGS="-stdlib=libc++"
+            -DCMAKE_CXX_STANDARD=23 \
+            -DCMAKE_CXX_FLAGS="-stdlib=libc++ -isystem /usr/include/c++/v1" \
+            -DCMAKE_EXE_LINKER_FLAGS="-lc++ -lc++abi"
           cmake --build build -j$(nproc)
           sudo cmake --install build
 
@@ -106,7 +109,7 @@ jobs:
 includedir=\${prefix}/include
 
 Name: tomlplusplus
-Description: TOML++ (header-only TOML parser for C++17/20/23)
+Description: TOML++ (header-only TOML parser)
 Version: 3.4.0
 Cflags: -I\${includedir}/toml++" | sudo tee /usr/lib/pkgconfig/tomlplusplus.pc
 
@@ -115,7 +118,9 @@ Cflags: -I\${includedir}/toml++" | sudo tee /usr/lib/pkgconfig/tomlplusplus.pc
           sudo -u yuu git clone --recursive https://github.com/hyprwm/hyprcursor.git /home/yuu/hyprcursor
           cd /home/yuu/hyprcursor
           cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr \
-            -DCMAKE_CXX_STANDARD=23 -DCMAKE_CXX_FLAGS="-stdlib=libc++"
+            -DCMAKE_CXX_STANDARD=23 \
+            -DCMAKE_CXX_FLAGS="-stdlib=libc++ -isystem /usr/include/c++/v1" \
+            -DCMAKE_EXE_LINKER_FLAGS="-lc++ -lc++abi"
           cmake --build build -j$(nproc)
           sudo cmake --install build
 
@@ -124,7 +129,9 @@ Cflags: -I\${includedir}/toml++" | sudo tee /usr/lib/pkgconfig/tomlplusplus.pc
           sudo -u yuu git clone --recursive https://github.com/hyprwm/aquamarine.git /home/yuu/aquamarine
           cd /home/yuu/aquamarine
           cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr \
-            -DCMAKE_CXX_STANDARD=23 -DCMAKE_CXX_FLAGS="-stdlib=libc++"
+            -DCMAKE_CXX_STANDARD=23 \
+            -DCMAKE_CXX_FLAGS="-stdlib=libc++ -isystem /usr/include/c++/v1" \
+            -DCMAKE_EXE_LINKER_FLAGS="-lc++ -lc++abi"
           cmake --build build -j$(nproc)
           sudo cmake --install build
 
