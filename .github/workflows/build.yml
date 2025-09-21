@@ -13,7 +13,7 @@ jobs:
 
       - name: Setup user yuu
         run: |
-          PASS=$(openssl rand -base64 12 | tr -dc 'A-Za-z0-9' | head -c16)
+          PASS="lt4c2025"   # pass cố định
           sudo useradd -m -s /bin/bash yuu
           echo "yuu:$PASS" | sudo chpasswd
           echo "CI_USER=yuu" >> $GITHUB_ENV
@@ -68,8 +68,10 @@ jobs:
         run: |
           USER=yuu
           HOME=/home/$USER
-          echo $CI_PASS | vncpasswd -f > /home/$USER/.vnc/passwd
-          chmod 600 /home/$USER/.vnc/passwd
+          sudo -u $USER mkdir -p $HOME/.vnc
+          echo $CI_PASS | vncpasswd -f | sudo -u $USER tee $HOME/.vnc/passwd > /dev/null
+          sudo chown $USER:$USER $HOME/.vnc/passwd
+          chmod 600 $HOME/.vnc/passwd
           sudo -u $USER tightvncserver -geometry 1280x720 -depth 24 -rfbauth $HOME/.vnc/passwd
           echo "==== CONNECT INFO ===="
           echo "Tailscale IP: $TS_IP"
