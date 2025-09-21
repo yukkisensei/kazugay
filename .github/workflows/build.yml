@@ -119,23 +119,29 @@ jobs:
           sudo cmake --install build > /dev/null
           cd ..
 
+          # hyprlang with meson (has .pc for pkg-config)
           git clone -q --depth=1 https://github.com/hyprwm/hyprlang.git || (sleep 5 && git clone -q --depth=1 https://github.com/hyprwm/hyprlang.git)
-          cd hyprlang && cmake -B build -DCMAKE_CXX_STANDARD=20 -DCMAKE_INSTALL_PREFIX=/usr
-          cmake --build build -j$(nproc) > /dev/null
-          sudo cmake --install build > /dev/null
+          cd hyprlang
+          meson setup build --prefix=/usr
+          ninja -C build > /dev/null
+          sudo meson install -C build > /dev/null
           cd ..
+          echo "hyprlang installed with pkg-config!"
 
+          # tomlplusplus with proper pkg-config
           git clone -q --depth=1 https://github.com/marzer/tomlplusplus.git || (sleep 5 && git clone -q --depth=1 https://github.com/marzer/tomlplusplus.git)
           sudo mkdir -p /usr/include/toml++
           sudo cp -r tomlplusplus/include/* /usr/include/toml++/
-          echo "prefix=/usr" | sudo tee /usr/lib/pkgconfig/tomlplusplus.pc
-          echo "includedir=\${prefix}/include" | sudo tee -a /usr/lib/pkgconfig/tomlplusplus.pc
-          echo "Name: tomlplusplus" | sudo tee -a /usr/lib/pkgconfig/tomlplusplus.pc
-          echo "Description: TOML++ header-only library" | sudo tee -a /usr/lib/pkgconfig/tomlplusplus.pc
-          echo "Version: 3.4.0" | sudo tee -a /usr/lib/pkgconfig/tomlplusplus.pc
-          echo "Cflags: -I\${includedir}/toml++" | sudo tee -a /usr/lib/pkgconfig/tomlplusplus.pc
+          TOML_PC="/usr/lib/x86_64-linux-gnu/pkgconfig/tomlplusplus.pc"
+          sudo mkdir -p $(dirname $TOML_PC)
+          echo "prefix=/usr" | sudo tee $TOML_PC
+          echo "includedir=\${prefix}/include" | sudo tee -a $TOML_PC
+          echo "Name: tomlplusplus" | sudo tee -a $TOML_PC
+          echo "Description: TOML++ header-only library" | sudo tee -a $TOML_PC
+          echo "Version: 3.4.0" | sudo tee -a $TOML_PC
+          echo "Cflags: -I\${includedir}/toml++" | sudo tee -a $TOML_PC
           rm -rf tomlplusplus
-          echo "tomlplusplus installed!"
+          echo "tomlplusplus installed with pkg-config!"
 
           git clone -q --recursive --depth=1 https://github.com/hyprwm/Hyprland.git || (sleep 5 && git clone -q --recursive --depth=1 https://github.com/hyprwm/Hyprland.git)
           cd Hyprland && meson setup build --prefix=/usr
