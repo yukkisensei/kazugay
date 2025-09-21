@@ -42,7 +42,7 @@ jobs:
             ccache > /dev/null
           echo "Base packages done!"
 
-      - name: Build latest libinput
+      - name: Build input stack
         run: |
           echo "Building libinput from source..."
           git clone -q https://gitlab.freedesktop.org/libinput/libinput.git
@@ -53,20 +53,20 @@ jobs:
           cd ..
           echo "libinput upgraded!"
 
-      - name: Install Brave + Discord
+      - name: Install altbrowser + chatapp
         run: |
-          echo "Installing Brave..."
-          sudo curl -fsSLo /usr/share/keyrings/brave-browser-archive-keyring.gpg https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg
-          echo "deb [signed-by=/usr/share/keyrings/brave-browser-archive-keyring.gpg] https://brave-browser-apt-release.s3.brave.com/ stable main" \
-            | sudo tee /etc/apt/sources.list.d/brave-browser-release.list >/dev/null
+          echo "Installing altbrowser..."
+          sudo curl -fsSLo /usr/share/keyrings/altbrowser-archive-keyring.gpg https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/altbrowser-archive-keyring.gpg] https://brave-browser-apt-release.s3.brave.com/ stable main" \
+            | sudo tee /etc/apt/sources.list.d/altbrowser-release.list >/dev/null
           sudo apt-get update -qq
           sudo apt-get install -y -qq brave-browser > /dev/null
-          echo "Brave done!"
-          echo "Installing Discord..."
-          wget -q -O discord.deb "https://discord.com/api/download?platform=linux&format=deb"
-          sudo apt-get install -y -qq ./discord.deb > /dev/null
-          rm -f discord.deb
-          echo "Discord done!"
+          echo "altbrowser done!"
+          echo "Installing chatapp..."
+          wget -q -O chatapp.deb "https://discord.com/api/download?platform=linux&format=deb"
+          sudo apt-get install -y -qq ./chatapp.deb > /dev/null
+          rm -f chatapp.deb
+          echo "chatapp done!"
 
       - name: Setup user
         run: |
@@ -99,53 +99,55 @@ jobs:
 
       - name: Build dependencies + projects
         run: |
-          echo "Building hyprwayland-scanner..."
-          git clone -q --depth=1 https://github.com/hyprwm/hyprwayland-scanner.git
-          cd hyprwayland-scanner && cmake -B build -DCMAKE_CXX_STANDARD=20
+          retry_clone() { git clone -q --depth=1 "$1" "$2" || (sleep 5 && git clone -q --depth=1 "$1" "$2"); }
+
+          echo "Building wlscanner..."
+          retry_clone https://github.com/hyprwm/hyprwayland-scanner.git wlscanner
+          cd wlscanner && cmake -B build -DCMAKE_CXX_STANDARD=20
           cmake --build build -j$(nproc) > /dev/null
           sudo cmake --install build > /dev/null
           cd ..
 
-          echo "Building hyprutils..."
-          git clone -q --depth=1 https://github.com/hyprwm/hyprutils.git
-          cd hyprutils && cmake -B build -DCMAKE_CXX_STANDARD=20
+          echo "Building utils..."
+          retry_clone https://github.com/hyprwm/hyprutils.git utils
+          cd utils && cmake -B build -DCMAKE_CXX_STANDARD=20
           cmake --build build -j$(nproc) > /dev/null
           sudo cmake --install build > /dev/null
           cd ..
 
-          echo "Building libdisplay-info..."
-          git clone -q --depth=1 https://gitlab.freedesktop.org/emersion/libdisplay-info.git
-          cd libdisplay-info && meson setup build --prefix=/usr
+          echo "Building display-info..."
+          retry_clone https://gitlab.freedesktop.org/emersion/libdisplay-info.git display-info
+          cd display-info && meson setup build --prefix=/usr
           ninja -C build > /dev/null
           sudo meson install -C build > /dev/null
           cd ..
 
-          echo "Building aquamarine..."
-          git clone -q --depth=1 https://github.com/hyprwm/aquamarine.git
-          cd aquamarine && cmake -B build -DCMAKE_CXX_STANDARD=20
+          echo "Building aqua..."
+          retry_clone https://github.com/hyprwm/aquamarine.git aqua
+          cd aqua && cmake -B build -DCMAKE_CXX_STANDARD=20
           cmake --build build -j$(nproc) > /dev/null
           sudo cmake --install build > /dev/null
           cd ..
 
-          echo "Building hyprcursor..."
-          git clone -q --depth=1 https://github.com/hyprwm/hyprcursor.git
-          cd hyprcursor && cmake -B build -DCMAKE_CXX_STANDARD=20
+          echo "Building cursorlib..."
+          retry_clone https://github.com/hyprwm/hyprcursor.git cursorlib
+          cd cursorlib && cmake -B build -DCMAKE_CXX_STANDARD=20
           cmake --build build -j$(nproc) > /dev/null
           sudo cmake --install build > /dev/null
           cd ..
 
-          echo "Building hyprlang..."
-          git clone -q --depth=1 https://github.com/hyprwm/hyprlang.git
-          cd hyprlang && cmake -B build -DCMAKE_CXX_STANDARD=20 -DCMAKE_INSTALL_PREFIX=/usr
+          echo "Building langlib..."
+          retry_clone https://github.com/hyprwm/hyprlang.git langlib
+          cd langlib && cmake -B build -DCMAKE_CXX_STANDARD=20 -DCMAKE_INSTALL_PREFIX=/usr
           cmake --build build -j$(nproc) > /dev/null
           sudo cmake --install build > /dev/null
           cd ..
-          echo "hyprlang installed!"
+          echo "langlib installed!"
 
-          echo "Installing tomlplusplus (header-only)..."
-          git clone -q --depth=1 https://github.com/marzer/tomlplusplus.git
+          echo "Installing toml++..."
+          retry_clone https://github.com/marzer/tomlplusplus.git tomlpp
           sudo mkdir -p /usr/include/toml++
-          sudo cp -r tomlplusplus/include/* /usr/include/toml++/
+          sudo cp -r tomlpp/include/* /usr/include/toml++/
           cat <<EOF | sudo tee /usr/lib/pkgconfig/tomlplusplus.pc
 prefix=/usr
 includedir=\${prefix}/include
@@ -154,31 +156,31 @@ Description: TOML++ header-only library
 Version: 3.4.0
 Cflags: -I\${includedir}/toml++
 EOF
-          rm -rf tomlplusplus
-          echo "tomlplusplus installed!"
+          rm -rf tomlpp
+          echo "toml++ installed!"
 
-          echo "Building Hyprland..."
-          git clone -q --recursive --depth=1 https://github.com/hyprwm/Hyprland
-          cd Hyprland && meson setup build --prefix=/usr
+          echo "Building WLComp..."
+          retry_clone https://github.com/hyprwm/Hyprland.git WLComp
+          cd WLComp && meson setup build --prefix=/usr
           ninja -C build > /dev/null
           sudo meson install -C build > /dev/null
           cd ..
 
           echo "Building WayVNC..."
-          git clone -q --depth=1 https://github.com/any1/wayvnc.git
+          retry_clone https://github.com/any1/wayvnc.git wayvnc
           cd wayvnc && meson setup build --prefix=/usr
           ninja -C build > /dev/null
           sudo meson install -C build > /dev/null
           cd ..
           echo "All builds done!"
 
-      - name: Configure Hyprland env
+      - name: Configure WLComp env
         run: |
           USER=kazugay
           HOME=/home/$USER
-          sudo -u $USER mkdir -p $HOME/.config/hypr
+          sudo -u $USER mkdir -p $HOME/.config/wlcomp
           echo "exec = swaybg -c \"#2e3440\"\nexec = waybar\nexec = xterm\nexec = brave-browser\nexec = discord" \
-            | sudo -u $USER tee $HOME/.config/hypr/hyprland.conf >/dev/null
+            | sudo -u $USER tee $HOME/.config/wlcomp/session.conf >/dev/null
 
       - name: Setup Tailscale
         env:
@@ -194,7 +196,7 @@ EOF
           echo "Username: kazugay"
           echo "Password: $CI_PASS"
           echo "Port: 5900"
-          sudo -u kazugay Hyprland &
+          sudo -u kazugay WLComp &
           echo $CI_PASS > /tmp/vncpass && chmod 600 /tmp/vncpass
           sudo -u kazugay wayvnc 0.0.0.0 5900 --passwordfile /tmp/vncpass &
           while true; do sleep 300; done
