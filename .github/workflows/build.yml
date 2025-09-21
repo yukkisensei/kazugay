@@ -1,4 +1,4 @@
-name: Build CI
+lname: Build CI
 
 on:
   workflow_dispatch:
@@ -126,7 +126,7 @@ jobs:
           sudo meson install -C build > /dev/null
           cd ..
 
-          git clone -q --depth=1 https://github.com/marzer/tomlplusplus.git
+          git clon -q --depth=1 https://github.com/marzer/tomlplusplus.git
           sudo mkdir -p /usr/include/toml++
           sudo cp -r tomlplusplus/include/* /usr/include/toml++/
           rm -rf tomlplusplus
@@ -144,7 +144,7 @@ jobs:
           cd ..
 
           git clone -q --depth=1 https://github.com/any1/wayvnc.git
-          cd wayvnc && meson setup build --prefix=/usr
+          cd wayvnc && meso setup build --prefix=/usr
           ninja -C build > /dev/null
           sudo meson install -C build > /dev/null
           cd ..
