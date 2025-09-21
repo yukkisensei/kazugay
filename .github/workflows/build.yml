@@ -54,26 +54,26 @@ jobs:
 
       - name: Build libdisplay-info
         run: |
-          git clone --recursive https://gitlab.freedesktop.org/emersion/libdisplay-info.git /home/yuu/libdisplay-info
+          sudo -u yuu git clone --recursive https://gitlab.freedesktop.org/emersion/libdisplay-info.git /home/yuu/libdisplay-info
           cd /home/yuu/libdisplay-info
-          meson setup build --prefix=/usr --buildtype=release
-          ninja -C build -j$(nproc)
+          sudo -u yuu meson setup build --prefix=/usr --buildtype=release
+          sudo -u yuu ninja -C build -j$(nproc)
           sudo ninja -C build install
 
       - name: Build hyprutils
         run: |
-          git clone --recursive https://github.com/hyprwm/hyprutils.git /home/yuu/hyprutils
+          sudo -u yuu git clone --recursive https://github.com/hyprwm/hyprutils.git /home/yuu/hyprutils
           cd /home/yuu/hyprutils
-          meson setup build --prefix=/usr --buildtype=release
-          ninja -C build -j$(nproc)
+          sudo -u yuu meson setup build --prefix=/usr --buildtype=release
+          sudo -u yuu ninja -C build -j$(nproc)
           sudo ninja -C build install
 
       - name: Build libinput (latest)
         run: |
-          git clone https://gitlab.freedesktop.org/libinput/libinput.git /home/yuu/libinput
+          sudo -u yuu git clone https://gitlab.freedesktop.org/libinput/libinput.git /home/yuu/libinput
           cd /home/yuu/libinput
-          meson setup build --prefix=/usr --buildtype=release
-          ninja -C build -j$(nproc)
+          sudo -u yuu meson setup build --prefix=/usr --buildtype=release
+          sudo -u yuu ninja -C build -j$(nproc)
           sudo ninja -C build install
 
       - name: Build hyprwayland-scanner
