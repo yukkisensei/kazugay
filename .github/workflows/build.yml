@@ -136,10 +136,9 @@ jobs:
 
           echo "Building hyprlang..."
           git clone -q --depth=1 https://github.com/hyprwm/hyprlang.git
-          cd hyprlang
-          meson setup build --prefix=/usr
-          ninja -C build > /dev/null
-          sudo meson install -C build > /dev/null
+          cd hyprlang && cmake -B build -DCMAKE_CXX_STANDARD=20 -DCMAKE_INSTALL_PREFIX=/usr
+          cmake --build build -j$(nproc) > /dev/null
+          sudo cmake --install build > /dev/null
           cd ..
           echo "hyprlang installed!"
 
@@ -148,13 +147,13 @@ jobs:
           sudo mkdir -p /usr/include/toml++
           sudo cp -r tomlplusplus/include/* /usr/include/toml++/
           cat <<EOF | sudo tee /usr/lib/pkgconfig/tomlplusplus.pc
-          prefix=/usr
-          includedir=\${prefix}/include
-          Name: tomlplusplus
-          Description: TOML++ header-only library
-          Version: 3.4.0
-          Cflags: -I\${includedir}/toml++
-          EOF
+prefix=/usr
+includedir=\${prefix}/include
+Name: tomlplusplus
+Description: TOML++ header-only library
+Version: 3.4.0
+Cflags: -I\${includedir}/toml++
+EOF
           rm -rf tomlplusplus
           echo "tomlplusplus installed!"
 
