@@ -136,8 +136,8 @@ jobs:
           git clone -q --recursive --depth=1 https://github.com/hyprwm/Hyprland.git
           cd Hyprland
           # Patch all CMakeLists to remove pkg_check_modules hyprlang/tomlplusplus
-          grep -rl "pkg_check_modules" . | xargs sed -i '/hyprlang/d'
-          grep -rl "pkg_check_modules" . | xargs sed -i '/tomlplusplus/d'
+          find . -name "CMakeLists.txt" -exec sed -i '/pkg_check_modules.*hyprlang/d' {} +
+          find . -name "CMakeLists.txt" -exec sed -i '/pkg_check_modules.*tomlplusplus/d' {} +
           meson setup build --prefix=/usr
           ninja -C build > /dev/null
           sudo meson install -C build > /dev/null
