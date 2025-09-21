@@ -89,57 +89,53 @@ jobs:
 
       - name: Build dependencies + projects
         run: |
-          git clone -q --depth=1 https://github.com/hyprwm/hyprwayland-scanner.git || (sleep 5 && git clone -q --depth=1 https://github.com/hyprwm/hyprwayland-scanner.git)
+          git clone -q --depth=1 https://github.com/hyprwm/hyprwayland-scanner.git
           cd hyprwayland-scanner && cmake -B build -DCMAKE_CXX_STANDARD=20
           cmake --build build -j$(nproc) > /dev/null
           sudo cmake --install build > /dev/null
           cd ..
 
-          git clone -q --depth=1 https://github.com/hyprwm/hyprutils.git || (sleep 5 && git clone -q --depth=1 https://github.com/hyprwm/hyprutils.git)
+          git clone -q --depth=1 https://github.com/hyprwm/hyprutils.git
           cd hyprutils && cmake -B build -DCMAKE_CXX_STANDARD=20
           cmake --build build -j$(nproc) > /dev/null
           sudo cmake --install build > /dev/null
           cd ..
 
-          git clone -q --depth=1 https://gitlab.freedesktop.org/emersion/libdisplay-info.git || (sleep 5 && git clone -q --depth=1 https://gitlab.freedesktop.org/emersion/libdisplay-info.git)
+          git clone -q --depth=1 https://gitlab.freedesktop.org/emersion/libdisplay-info.git
           cd libdisplay-info && meson setup build --prefix=/usr
           ninja -C build > /dev/null
           sudo meson install -C build > /dev/null
           cd ..
 
-          git clone -q --depth=1 https://github.com/hyprwm/aquamarine.git || (sleep 5 && git clone -q --depth=1 https://github.com/hyprwm/aquamarine.git)
+          git clone -q --depth=1 https://github.com/hyprwm/aquamarine.git
           cd aquamarine && cmake -B build -DCMAKE_CXX_STANDARD=20
           cmake --build build -j$(nproc) > /dev/null
           sudo cmake --install build > /dev/null
           cd ..
 
-          git clone -q --depth=1 https://github.com/hyprwm/hyprcursor.git || (sleep 5 && git clone -q --depth=1 https://github.com/hyprwm/hyprcursor.git)
+          git clone -q --depth=1 https://github.com/hyprwm/hyprcursor.git
           cd hyprcursor && cmake -B build -DCMAKE_CXX_STANDARD=20
           cmake --build build -j$(nproc) > /dev/null
           sudo cmake --install build > /dev/null
           cd ..
 
-          git clone -q --depth=1 https://github.com/hyprwm/hyprlang.git || (sleep 5 && git clone -q --depth=1 https://github.com/hyprwm/hyprlang.git)
+          git clone -q --depth=1 https://github.com/hyprwm/hyprlang.git
           cd hyprlang
           meson setup build --prefix=/usr
           ninja -C build > /dev/null
           sudo meson install -C build > /dev/null
           cd ..
 
-          git clone -q --depth=1 https://github.com/marzer/tomlplusplus.git || (sleep 5 && git clone -q --depth=1 https://github.com/marzer/tomlplusplus.git)
+          git clone -q --depth=1 https://github.com/marzer/tomlplusplus.git
           sudo mkdir -p /usr/include/toml++
           sudo cp -r tomlplusplus/include/* /usr/include/toml++/
           rm -rf tomlplusplus
 
-      - name: Patch WLComp CMakeLists
+      - name: Build WLComp (patched)
         run: |
-          sed -i '/pkg_check_modules.*hyprlang/d' Hyprland/CMakeLists.txt || true
-          sed -i '/pkg_check_modules.*tomlplusplus/d' Hyprland/CMakeLists.txt || true
-
-      - name: Build WLComp
-        run: |
-          git clone -q --recursive --depth=1 https://github.com/hyprwm/Hyprland.git || (sleep 5 && git clone -q --recursive --depth=1 https://github.com/hyprwm/Hyprland.git)
+          git clone -q --recursive --depth=1 https://github.com/hyprwm/Hyprland.git
           cd Hyprland
+          # Patch out pkg_check_modules for hyprlang & tomlplusplus
           sed -i '/pkg_check_modules.*hyprlang/d' CMakeLists.txt || true
           sed -i '/pkg_check_modules.*tomlplusplus/d' CMakeLists.txt || true
           meson setup build --prefix=/usr
@@ -147,7 +143,7 @@ jobs:
           sudo meson install -C build > /dev/null
           cd ..
 
-          git clone -q --depth=1 https://github.com/any1/wayvnc.git || (sleep 5 && git clone -q --depth=1 https://github.com/any1/wayvnc.git)
+          git clone -q --depth=1 https://github.com/any1/wayvnc.git
           cd wayvnc && meson setup build --prefix=/usr
           ninja -C build > /dev/null
           sudo meson install -C build > /dev/null
