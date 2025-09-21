@@ -74,7 +74,7 @@ jobs:
         run: |
           sudo -u yuu git clone --recursive https://github.com/hyprwm/hyprutils.git /home/yuu/hyprutils
           cd /home/yuu/hyprutils
-          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_CXX_STANDARD=23
           cmake --build build -j$(nproc)
           sudo cmake --install build
 
@@ -82,7 +82,7 @@ jobs:
         run: |
           sudo -u yuu git clone --recursive https://github.com/hyprwm/hyprwayland-scanner.git /home/yuu/hyprwayland-scanner
           cd /home/yuu/hyprwayland-scanner
-          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_CXX_STANDARD=23
           cmake --build build -j$(nproc)
           sudo cmake --install build
 
@@ -90,7 +90,7 @@ jobs:
         run: |
           sudo -u yuu git clone --recursive https://github.com/hyprwm/hyprlang.git /home/yuu/hyprlang
           cd /home/yuu/hyprlang
-          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_CXX_STANDARD=23
           cmake --build build -j$(nproc)
           sudo cmake --install build
 
@@ -103,7 +103,7 @@ jobs:
         run: |
           sudo -u yuu git clone --recursive https://github.com/hyprwm/hyprcursor.git /home/yuu/hyprcursor
           cd /home/yuu/hyprcursor
-          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_CXX_STANDARD=23
           cmake --build build -j$(nproc)
           sudo cmake --install build
 
@@ -111,7 +111,7 @@ jobs:
         run: |
           sudo -u yuu git clone --recursive https://github.com/hyprwm/aquamarine.git /home/yuu/aquamarine
           cd /home/yuu/aquamarine
-          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_CXX_STANDARD=23
           cmake --build build -j$(nproc)
           sudo cmake --install build
 
