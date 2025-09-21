@@ -61,9 +61,9 @@ jobs:
         run: |
           sudo -u yuu git clone --recursive https://github.com/hyprwm/hyprwayland-scanner.git /home/yuu/hyprwayland-scanner
           cd /home/yuu/hyprwayland-scanner
-          sudo -u yuu meson setup build --prefix=/usr --buildtype=release
-          sudo -u yuu ninja -C build -j$(nproc)
-          sudo ninja -C build install
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
+          cmake --build build -j$(nproc)
+          sudo cmake --install build
 
       - name: Build Aquamarine
         run: |
