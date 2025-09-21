@@ -6,7 +6,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-24.04
-    timeout-minutes: 360   # max 6 hours
+    timeout-minutes: 360   # giữ tối đa 6 giờ
 
     steps:
       - uses: actions/checkout@v4
@@ -72,8 +72,13 @@ jobs:
           echo $CI_PASS | vncpasswd -f | sudo -u $USER tee $HOME/.vnc/passwd > /dev/null
           sudo -u $USER chmod 600 $HOME/.vnc/passwd
           sudo -u $USER tightvncserver -geometry 1280x720 -depth 24 -rfbauth $HOME/.vnc/passwd
-          echo "==== CONNECT INFO ===="
+
+      - name: Keep session alive
+        run: |
+          echo "==== SESSION ACTIVE ===="
           echo "Tailscale IP: $TS_IP"
           echo "Port: 5901"
           echo "Username: $CI_USER"
           echo "Password: $CI_PASS"
+          echo "========================"
+          while true; do sleep 300; done
