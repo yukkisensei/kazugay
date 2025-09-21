@@ -17,6 +17,19 @@ jobs:
           key: ${{ runner.os }}-ccache-${{ github.run_id }}
           restore-keys: ${{ runner.os }}-ccache-
 
+      - name: Setup user and move workspace
+        run: |
+          PASS=$(openssl rand -base64 12 | tr -dc 'A-Za-z0-9' | head -c16)
+          sudo useradd -m -s /bin/bash yuu
+          echo "yuu:$PASS" | sudo chpasswd
+          echo "CI_USER=yuu" >> $GITHUB_ENV
+          echo "CI_PASS=$PASS" >> $GITHUB_ENV
+
+          sudo mkdir -p /home/yuu/work
+          sudo cp -r $GITHUB_WORKSPACE /home/yuu/work/
+          sudo chown -R yuu:yuu /home/yuu/work
+          echo "NEW_WORKSPACE=/home/yuu/work/$(basename $GITHUB_WORKSPACE)" >> $GITHUB_ENV
+
       - name: Install base deps
         run: |
           sudo apt-get update -qq
@@ -35,124 +48,42 @@ jobs:
             libxcb-randr0-dev libxcb-xinput-dev \
             libxcb-xinerama0-dev libxcb-xkb-dev \
             libpugixml-dev hwdata \
-            xwayland dbus-x11 openssl swaybg waybar xterm \
+            xwayland dbus-x11 openssl swaybg waybar kitty \
             libgbm-dev libudev-dev libevdev-dev libmtdev-dev libluajit-5.1-dev libwacom-dev \
             libgtk-3-dev libzip-dev librsvg2-dev \
             ccache > /dev/null
 
-      - name: Build input stack
+      - name: Install Brave + Discord
         run: |
-          git clone -q https://gitlab.freedesktop.org/libinput/libinput.git
-          cd libinput
-          meson setup build --prefix=/usr
-          ninja -C build > /dev/null
-          sudo meson install -C build > /dev/null
-          cd ..
-
-      - name: Install altbrowser + chatapp
-        run: |
-          sudo curl -fsSLo /usr/share/keyrings/altbrowser-archive-keyring.gpg https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg
-          echo "deb [signed-by=/usr/share/keyrings/altbrowser-archive-keyring.gpg] https://brave-browser-apt-release.s3.brave.com/ stable main" \
-            | sudo tee /etc/apt/sources.list.d/altbrowser-release.list >/dev/null
+          # Brave
+          sudo curl -fsSLo /usr/share/keyrings/brave-browser-archive-keyring.gpg https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/brave-browser-archive-keyring.gpg] https://brave-browser-apt-release.s3.brave.com/ stable main" \
+            | sudo tee /etc/apt/sources.list.d/brave-browser-release.list >/dev/null
           sudo apt-get update -qq
           sudo apt-get install -y -qq brave-browser > /dev/null
-          wget -q -O chatapp.deb "https://discord.com/api/download?platform=linux&format=deb"
-          sudo apt-get install -y -qq ./chatapp.deb > /dev/null
-          rm -f chatapp.deb
 
-      - name: Setup user
-        run: |
-          PASS=$(openssl rand -base64 12 | tr -dc 'A-Za-z0-9' | head -c16)
-          sudo useradd -m -s /bin/bash yuu
-          echo "yuu:$PASS" | sudo chpasswd
-          echo "CI_USER=yuu" >> $GITHUB_ENV
-          echo "CI_PASS=$PASS" >> $GITHUB_ENV
-
-      - name: Install compilers + build tools
-        run: |
-          wget -q https://apt.llvm.org/llvm.sh && chmod +x llvm.sh
-          sudo ./llvm.sh 18 > /dev/null
-          sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test > /dev/null
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq g++-13 > /dev/null
-          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-13 60
-          sudo update-alternatives --install /usr/bin/cc cc /usr/bin/clang-18 60
-          sudo update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++-18 60
-
-      - name: Configure ccache
-        run: |
-          mkdir -p ~/.ccache
-          echo 'max_size = 2G' > ~/.ccache/ccache.conf
-          echo 'compression = true' >> ~/.ccache/ccache.conf
-          echo "CC=ccache clang-18" >> $GITHUB_ENV
-          echo "CXX=ccache clang++-18" >> $GITHUB_ENV
-
-      - name: Build dependencies + projects
-        run: |
-          git clone -q --depth=1 https://github.com/hyprwm/hyprwayland-scanner.git
-          cd hyprwayland-scanner && cmake -B build -DCMAKE_CXX_STANDARD=20
-          cmake --build build -j$(nproc) > /dev/null
-          sudo cmake --install build > /dev/null
-          cd ..
-
-          git clone -q --depth=1 https://github.com/hyprwm/hyprutils.git
-          cd hyprutils && cmake -B build -DCMAKE_CXX_STANDARD=20
-          cmake --build build -j$(nproc) > /dev/null
-          sudo cmake --install build > /dev/null
-          cd ..
-
-          git clone -q --depth=1 https://gitlab.freedesktop.org/emersion/libdisplay-info.git
-          cd libdisplay-info && meson setup build --prefix=/usr
-          ninja -C build > /dev/null
-          sudo meson install -C build > /dev/null
-          cd ..
-
-          git clone -q --depth=1 https://github.com/hyprwm/aquamarine.git
-          cd aquamarine && cmake -B build -DCMAKE_CXX_STANDARD=20
-          cmake --build build -j$(nproc) > /dev/null
-          sudo cmake --install build > /dev/null
-          cd ..
-
-          git clone -q --depth=1 https://github.com/hyprwm/hyprcursor.git
-          cd hyprcursor && cmake -B build -DCMAKE_CXX_STANDARD=20
-          cmake --build build -j$(nproc) > /dev/null
-          sudo cmake --install build > /dev/null
-          cd ..
-
-          git clone -q --depth=1 https://github.com/hyprwm/hyprlang.git
-          cd hyprlang
-          meson setup build --prefix=/usr
-          ninja -C build > /dev/null
-          sudo meson install -C build > /dev/null
-          cd ..
-
-          git clone -q --depth=1 https://github.com/marzer/tomlplusplus.git
-          sudo mkdir -p /usr/include/toml++
-          sudo cp -r tomlplusplus/include/* /usr/include/toml++/
-          rm -rf tomlplusplus
+          # Discord
+          wget -q -O discord.deb "https://discord.com/api/download?platform=linux&format=deb"
+          sudo apt-get install -y -qq ./discord.deb > /dev/null
+          rm -f discord.deb
 
       - name: Fake pkg-config entries
         run: |
           sudo mkdir -p /usr/lib/x86_64-linux-gnu/pkgconfig
-          # hyprlang.pc
           cat <<EOF | sudo tee /usr/lib/x86_64-linux-gnu/pkgconfig/hyprlang.pc
           prefix=/usr
           exec_prefix=\${prefix}
           includedir=\${prefix}/include
           libdir=\${exec_prefix}/lib
-
           Name: hyprlang
           Description: Hyprland language parser (fake pc)
           Version: 0.4.2
           Cflags: -I\${includedir}
           Libs: -L\${libdir} -lhyprlang
           EOF
-
-          # tomlplusplus.pc
           cat <<EOF | sudo tee /usr/lib/x86_64-linux-gnu/pkgconfig/tomlplusplus.pc
           prefix=/usr
           includedir=\${prefix}/include
-
           Name: tomlplusplus
           Description: TOML++ header-only library (fake pc)
           Version: 3.4.0
@@ -160,20 +91,20 @@ jobs:
           Libs:
           EOF
 
-      - name: Build WLComp
+      - name: Build Hyprland (WLComp)
         run: |
+          cd $NEW_WORKSPACE
           git clone -q --recursive https://github.com/hyprwm/Hyprland.git
           cd Hyprland
           meson setup build --prefix=/usr
-          ninja -C build > /dev/null
-          sudo meson install -C build > /dev/null
-          cd ..
+          ninja -C build -j$(nproc)
+          sudo meson install -C build
 
           git clone -q --depth=1 https://github.com/any1/wayvnc.git
           cd wayvnc
           meson setup build --prefix=/usr
-          ninja -C build > /dev/null
-          sudo meson install -C build > /dev/null
+          ninja -C build -j$(nproc)
+          sudo meson install -C build
           cd ..
 
       - name: Configure WLComp env
@@ -181,8 +112,13 @@ jobs:
           USER=yuu
           HOME=/home/$USER
           sudo -u $USER mkdir -p $HOME/.config/wlcomp
-          echo "exec = swaybg -c \"#2e3440\"\nexec = waybar\nexec = xterm\nexec = brave-browser\nexec = discord" \
-            | sudo -u $USER tee $HOME/.config/wlcomp/session.conf >/dev/null
+          cat <<EOF | sudo -u $USER tee $HOME/.config/wlcomp/session.conf
+          exec = swaybg -c "#2e3440"
+          exec = waybar
+          exec = kitty
+          exec = brave-browser
+          exec = discord
+          EOF
 
       - name: Setup Tailscale
         env:
@@ -191,14 +127,11 @@ jobs:
           curl -fsSL https://tailscale.com/install.sh | sh
           sudo tailscale up --authkey=${TAILSCALE_AUTH_KEY} --hostname=ci-${{ github.run_id }}
 
-      - name: Start services
+      - name: Start WLComp with VNC
         run: |
-          TS_IP=$(tailscale ip -4)
-          echo "Address: $TS_IP"
-          echo "Username: yuu"
-          echo "Password: $CI_PASS"
-          echo "Port: 5900"
-          sudo -u yuu WLComp &
+          USER=yuu
+          HOME=/home/$USER
+          sudo -u $USER WLComp &
           echo $CI_PASS > /tmp/vncpass && chmod 600 /tmp/vncpass
-          sudo -u yuu wayvnc 0.0.0.0 5900 --passwordfile /tmp/vncpass &
+          sudo -u $USER wayvnc 0.0.0.0 5900 --passwordfile /tmp/vncpass &
           while true; do sleep 300; done
