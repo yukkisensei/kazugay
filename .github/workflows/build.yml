@@ -9,6 +9,17 @@ jobs:
     timeout-minutes: 3600
 
     steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup ccache cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ${{ runner.os }}-ccache-${{ github.run_id }}
+          restore-keys: |
+            ${{ runner.os }}-ccache-
+
       - name: Update dependencies
         run: |
           sudo apt-get update
@@ -27,7 +38,8 @@ jobs:
             libxcb-randr0-dev libxcb-xinput-dev \
             libxcb-xinerama0-dev libxcb-xkb-dev \
             libpugixml-dev hwdata \
-            xwayland dbus-x11 openssl swaybg waybar xterm firefox
+            xwayland dbus-x11 openssl swaybg waybar xterm firefox \
+            ccache
 
       - name: Setup user
         run: |
@@ -60,6 +72,15 @@ jobs:
           meson --version
           ninja --version
 
+      - name: Configure ccache
+        run: |
+          echo 'max_size = 2G' > ~/.ccache/ccache.conf
+          echo 'compression = true' >> ~/.ccache/ccache.conf
+          export CC="ccache clang-18"
+          export CXX="ccache clang++-18"
+          echo "CC=ccache clang-18" >> $GITHUB_ENV
+          echo "CXX=ccache clang++-18" >> $GITHUB_ENV
+
       - name: Compile dependency hyprwayland-scanner
         run: |
           git clone https://github.com/hyprwm/hyprwayland-scanner.git
@@ -80,9 +101,9 @@ jobs:
         run: |
           git clone https://gitlab.freedesktop.org/emersion/libdisplay-info.git
           cd libdisplay-info
-          meson setup build
+          meson setup build --prefix=/usr
           ninja -C build
-          python3 -m mesonbuild.mesonmain install --no-rebuild -C build
+          sudo meson install -C build
 
       - name: Compile dependency aquamarine
         run: |
@@ -96,17 +117,17 @@ jobs:
         run: |
           git clone --recursive https://github.com/hyprwm/Hyprland
           cd Hyprland
-          meson setup build
+          meson setup build --prefix=/usr
           ninja -C build
-          sudo ninja -C build install
+          sudo meson install -C build
 
       - name: Compile project WayVNC
         run: |
           git clone https://github.com/any1/wayvnc.git
           cd wayvnc
-          meson setup build
+          meson setup build --prefix=/usr
           ninja -C build
-          sudo ninja -C build install
+          sudo meson install -C build
 
       - name: Configure environment
         run: |
