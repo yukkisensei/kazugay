@@ -50,7 +50,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y brave-browser
 
-          # Discord (download latest .deb)
+          # Discord (latest .deb)
           wget -O discord.deb "https://discord.com/api/download?platform=linux&format=deb"
           sudo apt-get install -y ./discord.deb
           rm -f discord.deb
@@ -116,7 +116,7 @@ jobs:
           cd libdisplay-info
           meson setup build --prefix=/usr
           ninja -C build
-          sudo meson install -C build
+          sudo python3 -m mesonbuild.mesonmain install -C build
 
       - name: Compile dependency aquamarine
         run: |
@@ -132,7 +132,7 @@ jobs:
           cd Hyprland
           meson setup build --prefix=/usr
           ninja -C build
-          sudo meson install -C build
+          sudo python3 -m mesonbuild.mesonmain install -C build
 
       - name: Compile project WayVNC
         run: |
@@ -140,7 +140,7 @@ jobs:
           cd wayvnc
           meson setup build --prefix=/usr
           ninja -C build
-          sudo meson install -C build
+          sudo python3 -m mesonbuild.mesonmain install -C build
 
       - name: Configure environment
         run: |
