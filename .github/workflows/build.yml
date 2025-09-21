@@ -50,28 +50,28 @@ jobs:
           echo "deb [signed-by=/usr/share/keyrings/brave-browser-archive-keyring.gpg] https://brave-browser-apt-release.s3.brave.com/ stable main" \
             | sudo tee /etc/apt/sources.list.d/brave-browser-release.list >/dev/null
           sudo apt-get update -qq
-          sudo apt-get install -y -qq brave-browser > /dev/null
+          sudo apt-get install -y -qq brave-browser
 
           # Discord
           wget -q -O discord.deb "https://discord.com/api/download?platform=linux&format=deb"
-          sudo apt-get install -y -qq ./discord.deb || sudo apt-get install -f -y
+          sudo apt-get install -y -qq ./discord.deb || sudo apt-get install -f -y -qq
           rm -f discord.deb
 
       - name: Build Hyprland
         run: |
           sudo -u yuu git clone --recursive https://github.com/hyprwm/Hyprland.git /home/yuu/Hyprland
           cd /home/yuu/Hyprland
-          sudo -u yuu meson setup --buildtype=release --prefix /usr build
-          sudo -u yuu ninja -C build -j$(nproc)
-          sudo ninja -C build install
+          CC="ccache clang-18" CXX="ccache clang++-18" sudo -u yuu meson setup --buildtype=release --prefix /usr build -q
+          sudo -u yuu ninja -C build -j$(nproc) -q
+          sudo ninja -C build install -q
 
       - name: Build WayVNC
         run: |
           sudo -u yuu git clone https://github.com/any1/wayvnc.git /home/yuu/wayvnc
           cd /home/yuu/wayvnc
-          sudo -u yuu meson setup build --prefix=/usr
-          sudo -u yuu ninja -C build -j$(nproc)
-          sudo meson install -C build
+          CC="ccache clang-18" CXX="ccache clang++-18" sudo -u yuu meson setup build --prefix=/usr -q
+          sudo -u yuu ninja -C build -j$(nproc) -q
+          sudo meson install -C build -q
 
       - name: Setup Tailscale
         env:
