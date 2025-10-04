@@ -1,4 +1,4 @@
-name: ubuntu-rdp-gaming
+name: ubuntu-rdp-geming
 
 on:
   workflow_dispatch:
