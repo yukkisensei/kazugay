@@ -1,4 +1,4 @@
-name: ubuntu-rdp-geming
+name: ubuntu-rdp-gaming
 
 on:
   workflow_dispatch:
@@ -46,14 +46,14 @@ jobs:
           sudo apt-get clean
           sudo rm -rf /var/lib/apt/lists/*
 
-      - name: Install desktop environment (minimal for gaming)
+      - name: Install desktop environment minimal
         run: |
           sudo apt-get update -qq
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
             lxde-core xrdp openbox pcmanfm lxterminal \
             pulseaudio pavucontrol alsa-utils \
             xfonts-base fonts-liberation \
-            x11-xserver-utils dbus-x11
+            x11-xserver-utils dbus-x11 xserver-xorg-core
           sudo apt-get clean
           sudo rm -rf /var/lib/apt/lists/*
 
@@ -96,11 +96,11 @@ jobs:
           sudo apt-get clean
           sudo rm -rf /var/lib/apt/lists/*
 
-      - name: Fix GUI apps Disable GPU
+      - name: Fix GUI apps disable GPU
         run: |
           sudo mount -o remount,size=2G /dev/shm || true
           sudo mkdir -p /usr/local/bin
-          sudo bash -c 'cat > /usr/local/bin/discord-fixed' << 'EOF'
+          sudo bash -c 'cat > /usr/local/bin/discord-fixed' <<'EOF'
           #!/bin/bash
           /usr/share/discord/Discord \
             --disable-gpu \
@@ -112,7 +112,7 @@ jobs:
             "$@"
           EOF
           sudo chmod +x /usr/local/bin/discord-fixed
-          sudo bash -c 'cat > /usr/local/bin/brave-fixed' << 'EOF'
+          sudo bash -c 'cat > /usr/local/bin/brave-fixed' <<'EOF'
           #!/bin/bash
           /usr/bin/brave-browser \
             --disable-gpu \
@@ -125,19 +125,19 @@ jobs:
           EOF
           sudo chmod +x /usr/local/bin/brave-fixed
           sudo mkdir -p /home/yuu/.local/share/applications
-          sudo cp /usr/share/applications/discord.desktop /home/yuu/.local/share/applications/
-          sudo sed -i 's|Exec=/usr/share/discord/Discord|Exec=/usr/local/bin/discord-fixed|g' /home/yuu/.local/share/applications/discord.desktop
-          sudo cp /usr/share/applications/brave-browser.desktop /home/yuu/.local/share/applications/
-          sudo sed -i 's|Exec=brave-browser-stable|Exec=/usr/local/bin/brave-fixed|g' /home/yuu/.local/share/applications/brave-browser.desktop
-          sudo sed -i 's|Exec=/usr/bin/brave-browser|Exec=/usr/local/bin/brave-fixed|g' /home/yuu/.local/share/applications/brave-browser.desktop
-          sudo chown -R yuu:yuu /home/yuu/.local
-          echo "✓ Discord and Brave configured to run without GPU acceleration"
-          echo "✓ Shared memory increased to 2GB"
+          sudo cp /usr/share/applications/discord.desktop /home/yuu/.local/share/applications/ || true
+          sudo sed -i 's|Exec=/usr/share/discord/Discord|Exec=/usr/local/bin/discord-fixed|g' /home/yuu/.local/share/applications/discord.desktop || true
+          sudo cp /usr/share/applications/brave-browser.desktop /home/yuu/.local/share/applications/ || true
+          sudo sed -i 's|Exec=brave-browser-stable|Exec=/usr/local/bin/brave-fixed|g' /home/yuu/.local/share/applications/brave-browser.desktop || true
+          sudo sed -i 's|Exec=/usr/bin/brave-browser|Exec=/usr/local/bin/brave-fixed|g' /home/yuu/.local/share/applications/brave-browser.desktop || true
+          sudo chown -R yuu:yuu /home/yuu/.local || true
+          echo "Discord and Brave configured"
+          echo "Shared memory remounted"
 
       - name: Configure GameMode
         run: |
           sudo mkdir -p /etc/gamemode
-          sudo bash -c 'cat > /etc/gamemode/gamemode.ini' << 'EOF'
+          sudo bash -c 'cat > /etc/gamemode/gamemode.ini' <<'EOF'
           [general]
           renice=10
           ioprio=0
@@ -156,7 +156,7 @@ jobs:
       - name: Configure MangoHud
         run: |
           sudo mkdir -p /home/yuu/.config/MangoHud
-          sudo bash -c 'cat > /home/yuu/.config/MangoHud/MangoHud.conf' << 'EOF'
+          sudo bash -c 'cat > /home/yuu/.config/MangoHud/MangoHud.conf' <<'EOF'
           fps
           frametime
           cpu_temp
@@ -171,7 +171,7 @@ jobs:
 
       - name: Optimize RDP for gaming
         run: |
-          sudo bash -c 'cat > /etc/xrdp/xrdp.ini' << 'EOF'
+          sudo bash -c 'cat > /etc/xrdp/xrdp.ini' <<'EOF'
           [Globals]
           ini_version=1
           fork=true
@@ -198,7 +198,7 @@ jobs:
           ip=127.0.0.1
           port=-1
           EOF
-          sudo bash -c 'cat > /etc/xrdp/sesman.ini' << 'EOF'
+          sudo bash -c 'cat > /etc/xrdp/sesman.ini' <<'EOF'
           [Globals]
           ListenPort=3350
           EnableUserWindowManager=true
@@ -218,7 +218,7 @@ jobs:
       - name: Configure desktop for gaming
         run: |
           sudo mkdir -p /home/yuu/.config/openbox
-          sudo bash -c 'cat > /home/yuu/.config/openbox/lxde-rc.xml' << 'EOF'
+          sudo bash -c 'cat > /home/yuu/.config/openbox/lxde-rc.xml' <<'EOF'
           <?xml version="1.0" encoding="UTF-8"?>
           <openbox_config xmlns="http://openbox.org/3.4/rc">
             <theme>
@@ -235,13 +235,13 @@ jobs:
           </openbox_config>
           EOF
           sudo mkdir -p /home/yuu/.config/lxsession/LXDE
-          sudo bash -c 'cat > /home/yuu/.config/lxsession/LXDE/autostart' << 'EOF'
+          sudo bash -c 'cat > /home/yuu/.config/lxsession/LXDE/autostart' <<'EOF'
           @lxpanel --profile LXDE
           @pcmanfm --desktop --profile LXDE
           @/usr/bin/pulseaudio --start
           EOF
           sudo mkdir -p /home/yuu/.config/pulse
-          sudo bash -c 'cat > /home/yuu/.config/pulse/daemon.conf' << 'EOF'
+          sudo bash -c 'cat > /home/yuu/.config/pulse/daemon.conf' <<'EOF'
           default-sample-rate = 48000
           alternate-sample-rate = 44100
           default-fragments = 2
@@ -297,16 +297,13 @@ jobs:
 
       - name: Verify gaming setup
         run: |
-          echo "=== Verifying Gaming Environment ==="
-          echo "Graphics:"
           glxinfo | grep "OpenGL renderer" || echo "GLX not available"
           vulkaninfo --summary 2>/dev/null | grep "GPU" || echo "Vulkan info not available"
-          echo ""
-          which steam && echo "✓ Steam installed" || echo "✗ Steam missing"
-          which wine && echo "✓ Wine installed" || echo "✗ Wine missing"
-          which lutris && echo "✓ Lutris installed" || echo "✗ Lutris missing"
-          which gamemoded && echo "✓ GameMode installed" || echo "✗ GameMode missing"
-          which mangohud && echo "✓ MangoHud installed" || echo "✗ MangoHud missing"
+          which steam && echo "Steam installed" || echo "Steam missing"
+          which wine && echo "Wine installed" || echo "Wine missing"
+          which lutris && echo "Lutris installed" || echo "Lutris missing"
+          which gamemoded && echo "GameMode installed" || echo "GameMode missing"
+          which mangohud && echo "MangoHud installed" || echo "MangoHud missing"
 
       - name: Keep alive - Gaming Session
         run: |
@@ -332,10 +329,5 @@ jobs:
           echo "║ ✓ PulseAudio Low Latency                  ║"
           echo "║ ✓ Vulkan & OpenGL Drivers                 ║"
           echo "║ ✓ Network Optimized                       ║"
-          echo "╠════════════════════════════════════════════╣"
-          echo "║ Tips:                                      ║"
-          echo "║ • Run games with: gamemoderun <game>      ║"
-          echo "║ • FPS overlay: mangohud <game>            ║"
-          echo "║ • Combined: gamemoderun mangohud <game>   ║"
           echo "╚════════════════════════════════════════════╝"
           while true; do sleep 300; done
