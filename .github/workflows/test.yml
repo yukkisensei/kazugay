@@ -64,7 +64,10 @@ jobs:
          
           Invoke-WebRequest -Uri $tsUrl -OutFile $installerPath
 Start-Process msiexec.exe -ArgumentList "/i", "`"$installerPath`"", "/quiet", "/norestart" -Wait
-          Remove-Item $installerPath -Force
+if (Test-Path -Path $installerPath) {
+    Remove-Item -Path $installerPath -Force -ErrorAction Stop
+}
+
 
       - name: Establish Tailscale Connection
         run: |
