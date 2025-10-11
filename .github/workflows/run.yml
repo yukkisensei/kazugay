@@ -5,7 +5,7 @@ on:
 
 env:
   INSTALLERS_DIR: installers
-  INSTALLER_CACHE_KEY: installers-windows-v2
+  INSTALLER_CACHE_KEY: installers-windows-v3
 
 jobs:
   setup-runner:
