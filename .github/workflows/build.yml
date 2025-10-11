@@ -5,7 +5,7 @@ on:
 
 env:
   INSTALLERS_DIR: installers
-  INSTALLER_CACHE_KEY: installers-windows-v1
+  INSTALLER_CACHE_KEY: installers-windows-v2
 
 jobs:
   populate-cache:
@@ -61,7 +61,11 @@ jobs:
 
           Invoke-WebRequest -Uri 'https://laptop-updates.brave.com/latest/winx64' -OutFile (Join-Path $target 'BraveBrowserSetup.exe') -UseBasicParsing
 
-          Invoke-WebRequest -Uri 'https://windsurf-stable.s3.us-west-2.amazonaws.com/windsurf-setup.exe' -OutFile (Join-Path $target 'WindsurfSetup.exe') -UseBasicParsing
+          Invoke-Download -Urls @(
+            'https://windsurf-releases.s3.us-west-2.amazonaws.com/windsurf-setup.exe',
+            'https://windsurf-releases.s3.amazonaws.com/windsurf-setup.exe',
+            'https://download.windsurf.dev/windsurf-setup.exe'
+          ) -OutFile (Join-Path $target 'WindsurfSetup.exe')
 
           Invoke-WebRequest -Uri 'https://pkgs.tailscale.com/stable/tailscale-setup-latest-amd64.msi' -OutFile (Join-Path $target 'tailscale.msi') -UseBasicParsing
 
