@@ -1,0 +1,106 @@
+name: windows-11-runner-setup
+
+on:
+  workflow_dispatch:
+
+env:
+  INSTALLERS_DIR: installers
+  INSTALLER_CACHE_KEY: installers-windows-v1
+
+jobs:
+  setup-runner:
+    runs-on: windows-latest
+    steps:
+      - name: Restore installer cache
+        id: restore-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.INSTALLERS_DIR }}
+          key: ${{ env.INSTALLER_CACHE_KEY }}
+
+      - name: Verify installers
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ('${{ steps.restore-cache.outputs.cache-hit }}' -ne 'true') {
+            throw 'Installer cache chưa tồn tại. Vui lòng chạy workflow cache-windows-installers trước.'
+          }
+
+          $global:InstallerPath = Join-Path $env:GITHUB_WORKSPACE $env:INSTALLERS_DIR
+
+          foreach ($file in 'DiscordSetup.exe','BraveBrowserSetup.exe','WindsurfSetup.exe','tailscale.msi') {
+            $full = Join-Path $InstallerPath $file
+            if (-not (Test-Path $full)) {
+              throw "Không tìm thấy file $file trong cache."
+            }
+          }
+
+      - name: Configure Python 3.12.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.10'
+
+      - name: Install desktop applications
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installerPath = Join-Path $env:GITHUB_WORKSPACE $env:INSTALLERS_DIR
+
+          $discordInstaller = Join-Path $installerPath 'DiscordSetup.exe'
+          Start-Process -FilePath $discordInstaller -ArgumentList '/S' -Wait
+
+          $braveInstaller = Join-Path $installerPath 'BraveBrowserSetup.exe'
+          Start-Process -FilePath msiexec.exe -ArgumentList "/i `"$braveInstaller`" /qn /norestart" -Wait
+
+          $windsurfInstaller = Join-Path $installerPath 'WindsurfSetup.exe'
+          Start-Process -FilePath $windsurfInstaller -ArgumentList '/S' -Wait
+
+      - name: Configure local user
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $password = 'lt4c@2025'
+          net user 'yuu' 2>$null
+          if ($LASTEXITCODE -ne 0) {
+            net user 'yuu' $password /add
+          } else {
+            net user 'yuu' $password
+          }
+          net user 'yuu' /PASSWORDCHG:NO
+          wmic useraccount where "Name='yuu'" set PasswordExpires=FALSE | Out-Null
+
+      - name: Install và đăng nhập Tailscale
+        shell: pwsh
+        env:
+          TAILSCALE_AUTH_KEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (-not $env:TAILSCALE_AUTH_KEY) {
+            throw 'TAILSCALE_AUTH_KEY secret không khả dụng.'
+          }
+
+          $installerPath = Join-Path $env:GITHUB_WORKSPACE $env:INSTALLERS_DIR
+          $tailscaleInstaller = Join-Path $installerPath 'tailscale.msi'
+          Start-Process -FilePath msiexec.exe -ArgumentList "/i `"$tailscaleInstaller`" /qn /norestart" -Wait
+
+          $tailscaleExe = Join-Path $env:ProgramFiles 'Tailscale IPN\tailscale.exe'
+          if (-not (Test-Path $tailscaleExe)) {
+            $tailscaleExe = 'C:\Program Files\Tailscale\tailscale.exe'
+          }
+
+          Start-Service -Name 'Tailscale' -ErrorAction SilentlyContinue
+          & $tailscaleExe up --authkey $env:TAILSCALE_AUTH_KEY --hostname ("gha-" + $env:RUNNER_NAME) --accept-dns=false --reset | Out-Null
+
+          $tailscaleIp = (& $tailscaleExe ip -4)[0]
+          if (-not $tailscaleIp) {
+            throw 'Không xác định được địa chỉ IPv4 Tailscale.'
+          }
+
+          "TAILSCALE_IP=$tailscaleIp" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Xuất thông tin kết nối
+        shell: pwsh
+        run: |
+          Write-Host "::notice::Tailscale IPv4 Address: $env:TAILSCALE_IP"
+          Write-Host '::notice::Username: yuu'
+          Write-Host '::notice::Password: lt4c@2025'
