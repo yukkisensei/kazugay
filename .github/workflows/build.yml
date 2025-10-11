@@ -5,7 +5,7 @@ on:
 
 env:
   INSTALLERS_DIR: installers
-  INSTALLER_CACHE_KEY: installers-windows-v2
+  INSTALLER_CACHE_KEY: installers-windows-v3
 
 jobs:
   populate-cache:
@@ -34,7 +34,7 @@ jobs:
             foreach ($url in $Urls) {
               for ($attempt = 1; $attempt -le $Retries; $attempt++) {
                 try {
-                  Invoke-WebRequest -Uri $url -OutFile $OutFile -UseBasicParsing -ErrorAction Stop
+                  Invoke-WebRequest -Uri $url -OutFile $OutFile -ErrorAction Stop
                   if ((Test-Path $OutFile) -and ((Get-Item $OutFile).Length -gt 0)) {
                     return
                   }
@@ -59,15 +59,22 @@ jobs:
             'https://discord.com/api/download?platform=win&format=exe'
           ) -OutFile (Join-Path $target 'DiscordSetup.exe')
 
-          Invoke-WebRequest -Uri 'https://laptop-updates.brave.com/latest/winx64' -OutFile (Join-Path $target 'BraveBrowserSetup.exe') -UseBasicParsing
+          Invoke-WebRequest -Uri 'https://laptop-updates.brave.com/latest/winx64' -OutFile (Join-Path $target 'BraveBrowserSetup.exe')
 
-          Invoke-Download -Urls @(
-            'https://windsurf-releases.s3.us-west-2.amazonaws.com/windsurf-setup.exe',
-            'https://windsurf-releases.s3.amazonaws.com/windsurf-setup.exe',
-            'https://download.windsurf.dev/windsurf-setup.exe'
-          ) -OutFile (Join-Path $target 'WindsurfSetup.exe')
+          $windsurfUrls = @()
+          if ($env:WINDSURF_INSTALLER_URL) {
+            $windsurfUrls += $env:WINDSURF_INSTALLER_URL
+          }
+          $windsurfUrls += @(
+            'https://windsurf-stable.codeiumdata.com/win32-x64-user/stable/6a266ac3a91f80e64147aaf1e7640a92571474cf/WindsurfUserSetup-x64-1.12.16.exe',
+            'https://download.windsurf.dev/WindsurfUserSetup-x64.exe',
+            'https://windsurf-releases.s3.us-west-2.amazonaws.com/WindsurfUserSetup-x64.exe',
+            'https://windsurf-releases.s3.amazonaws.com/WindsurfUserSetup-x64.exe'
+          )
 
-          Invoke-WebRequest -Uri 'https://pkgs.tailscale.com/stable/tailscale-setup-latest-amd64.msi' -OutFile (Join-Path $target 'tailscale.msi') -UseBasicParsing
+          Invoke-Download -Urls $windsurfUrls -OutFile (Join-Path $target 'WindsurfSetup.exe')
+
+          Invoke-WebRequest -Uri 'https://pkgs.tailscale.com/stable/tailscale-setup-latest-amd64.msi' -OutFile (Join-Path $target 'tailscale.msi')
 
       - name: Report cache status
         shell: pwsh
