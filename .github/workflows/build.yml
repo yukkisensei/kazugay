@@ -1,18 +1,25 @@
-name: windows-11-runner-setup
+name: cache-windows-installers
 
 on:
   workflow_dispatch:
 
+env:
+  INSTALLERS_DIR: installers
+  INSTALLER_CACHE_KEY: installers-windows-v1
+
 jobs:
-  setup-runner:
+  populate-cache:
     runs-on: windows-latest
     steps:
-      - name: Configure Python 3.12.10
-        uses: actions/setup-python@v5
+      - name: Restore installer cache
+        id: restore-cache
+        uses: actions/cache@v4
         with:
-          python-version: '3.12.10'
+          path: ${{ env.INSTALLERS_DIR }}
+          key: ${{ env.INSTALLER_CACHE_KEY }}
 
-      - name: Install desktop applications
+      - name: Download installers
+        if: steps.restore-cache.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -43,73 +50,26 @@ jobs:
             throw "Failed to download file after trying all URLs: $($Urls -join ', ')"
           }
 
-          $downloads = Join-Path $env:TEMP 'gha-downloads'
-          New-Item -ItemType Directory -Path $downloads -Force | Out-Null
+          $target = Join-Path $env:GITHUB_WORKSPACE $env:INSTALLERS_DIR
+          New-Item -ItemType Directory -Path $target -Force | Out-Null
 
-          $discordInstaller = Join-Path $downloads 'DiscordSetup.exe'
           Invoke-Download -Urls @(
             'https://dl.discordapp.net/distro/app/stable/win/x64/DiscordSetup.exe',
             'https://dl.discordapp.net/apps/win/0.0.309/DiscordSetup.exe',
             'https://discord.com/api/download?platform=win&format=exe'
-          ) -OutFile $discordInstaller
-          Start-Process -FilePath $discordInstaller -ArgumentList '/S' -Wait
+          ) -OutFile (Join-Path $target 'DiscordSetup.exe')
 
-          $braveInstaller = Join-Path $downloads 'BraveBrowserSetup.exe'
-          Invoke-WebRequest -Uri 'https://laptop-updates.brave.com/latest/winx64' -OutFile $braveInstaller -UseBasicParsing
-          Start-Process -FilePath msiexec.exe -ArgumentList "/i `"$braveInstaller`" /qn /norestart" -Wait
+          Invoke-WebRequest -Uri 'https://laptop-updates.brave.com/latest/winx64' -OutFile (Join-Path $target 'BraveBrowserSetup.exe') -UseBasicParsing
 
-          $windsurfInstaller = Join-Path $downloads 'WindsurfSetup.exe'
-          Invoke-WebRequest -Uri 'https://windsurf-stable.s3.us-west-2.amazonaws.com/windsurf-setup.exe' -OutFile $windsurfInstaller -UseBasicParsing
-          Start-Process -FilePath $windsurfInstaller -ArgumentList '/S' -Wait
+          Invoke-WebRequest -Uri 'https://windsurf-stable.s3.us-west-2.amazonaws.com/windsurf-setup.exe' -OutFile (Join-Path $target 'WindsurfSetup.exe') -UseBasicParsing
 
-          Remove-Item -Path $downloads -Recurse -Force
+          Invoke-WebRequest -Uri 'https://pkgs.tailscale.com/stable/tailscale-setup-latest-amd64.msi' -OutFile (Join-Path $target 'tailscale.msi') -UseBasicParsing
 
-      - name: Configure local user
+      - name: Report cache status
         shell: pwsh
         run: |
-          $ErrorActionPreference = 'Stop'
-          $password = 'lt4c@2025'
-          net user 'yuu' 2>$null
-          if ($LASTEXITCODE -ne 0) {
-            net user 'yuu' $password /add
+          if ('${{ steps.restore-cache.outputs.cache-hit }}' -eq 'true') {
+            Write-Host '::notice::Installer cache already populated.'
           } else {
-            net user 'yuu' $password
-          }
-          net user 'yuu' /PASSWORDCHG:NO
-          wmic useraccount where "Name='yuu'" set PasswordExpires=FALSE | Out-Null
-
-      - name: Install and authenticate Tailscale
-        shell: pwsh
-        env:
-          TAILSCALE_AUTH_KEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
-        run: |
-          $ErrorActionPreference = 'Stop'
-          if (-not $env:TAILSCALE_AUTH_KEY) {
-            throw 'TAILSCALE_AUTH_KEY secret is not available.'
-          }
-
-          $tailscaleInstaller = Join-Path $env:TEMP 'tailscale.msi'
-          Invoke-WebRequest -Uri 'https://pkgs.tailscale.com/stable/tailscale-setup-latest-amd64.msi' -OutFile $tailscaleInstaller -UseBasicParsing
-          Start-Process -FilePath msiexec.exe -ArgumentList "/i `"$tailscaleInstaller`" /qn /norestart" -Wait
-
-          $tailscaleExe = Join-Path $env:ProgramFiles 'Tailscale IPN\tailscale.exe'
-          if (-not (Test-Path $tailscaleExe)) {
-            $tailscaleExe = 'C:\Program Files\Tailscale\tailscale.exe'
-          }
-
-          Start-Service -Name 'Tailscale' -ErrorAction SilentlyContinue
-          & $tailscaleExe up --authkey $env:TAILSCALE_AUTH_KEY --hostname ("gha-" + $env:RUNNER_NAME) --accept-dns=false --reset | Out-Null
-
-          $tailscaleIp = (& $tailscaleExe ip -4)[0]
-          if (-not $tailscaleIp) {
-            throw 'Unable to determine Tailscale IPv4 address.'
-          }
-
-          "TAILSCALE_IP=$tailscaleIp" | Out-File -FilePath $env:GITHUB_ENV -Append
-
-      - name: Emit connection details
-        shell: pwsh
-        run: |
-          Write-Host "::notice::Tailscale IPv4 Address: $env:TAILSCALE_IP"
-          Write-Host '::notice::Username: yuu'
-          Write-Host '::notice::Password: lt4c@2025'
+            Write-Host '::notice::Installer cache created. Future runs can restore key:'
+            Write-Host '::notice::${{ env.INSTALLER_CACHE_KEY }}'
