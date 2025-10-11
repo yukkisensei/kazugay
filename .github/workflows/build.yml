@@ -19,10 +19,14 @@ jobs:
           key: ${{ env.INSTALLER_CACHE_KEY }}
 
       - name: Download installers
-        if: steps.restore-cache.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
+
+          if ('${{ steps.restore-cache.outputs.cache-hit }}' -eq 'true') {
+            Write-Host '::notice::Cache already populated. Skipping downloads.'
+            exit 0
+          }
 
           function Invoke-Download {
             param(
