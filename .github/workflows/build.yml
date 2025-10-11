@@ -88,3 +88,4 @@ jobs:
           } else {
             Write-Host '::notice::Installer cache created. Future runs can restore key:'
             Write-Host '::notice::${{ env.INSTALLER_CACHE_KEY }}'
+          }
