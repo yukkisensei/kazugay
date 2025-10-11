@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  configure-runner:
+  setup-runner:
     runs-on: windows-latest
     steps:
       - name: Configure Python 3.12.10
@@ -16,19 +16,50 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
+
+          function Invoke-Download {
+            param(
+              [Parameter(Mandatory = $true)][string[]]$Urls,
+              [Parameter(Mandatory = $true)][string]$OutFile,
+              [int]$Retries = 3
+            )
+
+            foreach ($url in $Urls) {
+              for ($attempt = 1; $attempt -le $Retries; $attempt++) {
+                try {
+                  Invoke-WebRequest -Uri $url -OutFile $OutFile -UseBasicParsing -ErrorAction Stop
+                  if ((Test-Path $OutFile) -and ((Get-Item $OutFile).Length -gt 0)) {
+                    return
+                  }
+                } catch {
+                  if ($attempt -eq $Retries) {
+                    Remove-Item -Path $OutFile -ErrorAction SilentlyContinue
+                  }
+                  Start-Sleep -Seconds ([math]::Pow(2, $attempt))
+                }
+              }
+            }
+
+            throw "Failed to download file after trying all URLs: $($Urls -join ', ')"
+          }
+
           $downloads = Join-Path $env:TEMP 'gha-downloads'
           New-Item -ItemType Directory -Path $downloads -Force | Out-Null
 
           $discordInstaller = Join-Path $downloads 'DiscordSetup.exe'
-          Invoke-WebRequest -Uri 'https://discord.com/api/download?platform=win&format=exe' -OutFile $discordInstaller
+          Invoke-Download -Urls @(
+            'https://dl.discordapp.net/distro/app/stable/win/x64/DiscordSetup.exe',
+            'https://dl.discordapp.net/apps/win/0.0.309/DiscordSetup.exe',
+            'https://discord.com/api/download?platform=win&format=exe'
+          ) -OutFile $discordInstaller
           Start-Process -FilePath $discordInstaller -ArgumentList '/S' -Wait
 
           $braveInstaller = Join-Path $downloads 'BraveBrowserSetup.exe'
-          Invoke-WebRequest -Uri 'https://laptop-updates.brave.com/latest/winx64' -OutFile $braveInstaller
+          Invoke-WebRequest -Uri 'https://laptop-updates.brave.com/latest/winx64' -OutFile $braveInstaller -UseBasicParsing
           Start-Process -FilePath msiexec.exe -ArgumentList "/i `"$braveInstaller`" /qn /norestart" -Wait
 
           $windsurfInstaller = Join-Path $downloads 'WindsurfSetup.exe'
-          Invoke-WebRequest -Uri 'https://windsurf-stable.s3.us-west-2.amazonaws.com/windsurf-setup.exe' -OutFile $windsurfInstaller
+          Invoke-WebRequest -Uri 'https://windsurf-stable.s3.us-west-2.amazonaws.com/windsurf-setup.exe' -OutFile $windsurfInstaller -UseBasicParsing
           Start-Process -FilePath $windsurfInstaller -ArgumentList '/S' -Wait
 
           Remove-Item -Path $downloads -Recurse -Force
@@ -58,7 +89,7 @@ jobs:
           }
 
           $tailscaleInstaller = Join-Path $env:TEMP 'tailscale.msi'
-          Invoke-WebRequest -Uri 'https://pkgs.tailscale.com/stable/tailscale-setup-latest-amd64.msi' -OutFile $tailscaleInstaller
+          Invoke-WebRequest -Uri 'https://pkgs.tailscale.com/stable/tailscale-setup-latest-amd64.msi' -OutFile $tailscaleInstaller -UseBasicParsing
           Start-Process -FilePath msiexec.exe -ArgumentList "/i `"$tailscaleInstaller`" /qn /norestart" -Wait
 
           $tailscaleExe = Join-Path $env:ProgramFiles 'Tailscale IPN\tailscale.exe'
