@@ -1,411 +1,84 @@
-name: ubuntu-rdp-gaming
+name: windows-11-runner-setup
 
 on:
   workflow_dispatch:
 
 jobs:
-  build:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 360
-
+  configure-runner:
+    runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Configure Python 3.12.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.10'
 
-      - name: Setup gaming user
+      - name: Install desktop applications
+        shell: pwsh
         run: |
-          PASS="lt4c2025"
-          sudo useradd -m -s /bin/bash yuu
-          echo "yuu:$PASS" | sudo chpasswd
-          sudo usermod -aG audio,video,input,plugdev yuu
-          echo "CI_USER=yuu" >> $GITHUB_ENV
-          echo "CI_PASS=$PASS" >> $GITHUB_ENV
+          $ErrorActionPreference = 'Stop'
+          $downloads = Join-Path $env:TEMP 'gha-downloads'
+          New-Item -ItemType Directory -Path $downloads -Force | Out-Null
 
-      - name: System performance tuning for gaming
+          $discordInstaller = Join-Path $downloads 'DiscordSetup.exe'
+          Invoke-WebRequest -Uri 'https://discord.com/api/download?platform=win&format=exe' -OutFile $discordInstaller
+          Start-Process -FilePath $discordInstaller -ArgumentList '/S' -Wait
+
+          $braveInstaller = Join-Path $downloads 'BraveBrowserSetup.exe'
+          Invoke-WebRequest -Uri 'https://laptop-updates.brave.com/latest/winx64' -OutFile $braveInstaller
+          Start-Process -FilePath msiexec.exe -ArgumentList "/i `"$braveInstaller`" /qn /norestart" -Wait
+
+          $windsurfInstaller = Join-Path $downloads 'WindsurfSetup.exe'
+          Invoke-WebRequest -Uri 'https://windsurf-stable.s3.us-west-2.amazonaws.com/windsurf-setup.exe' -OutFile $windsurfInstaller
+          Start-Process -FilePath $windsurfInstaller -ArgumentList '/S' -Wait
+
+          Remove-Item -Path $downloads -Recurse -Force
+
+      - name: Configure local user
+        shell: pwsh
         run: |
-          # CPU Governor to performance mode
-          echo "performance" | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor 2>/dev/null || true
-          
-          # System performance tweaks
-          sudo sysctl -w vm.swappiness=10 || true
-          sudo sysctl -w vm.vfs_cache_pressure=50 || true
-          sudo sysctl -w kernel.sched_migration_cost_ns=5000000 || true
-          sudo sysctl -w kernel.sched_autogroup_enabled=0 || true
-          
-          # Network optimization for low latency
-          sudo sysctl -w net.core.rmem_max=16777216 || true
-          sudo sysctl -w net.core.wmem_max=16777216 || true
-          sudo sysctl -w net.ipv4.tcp_fastopen=3 || true
-          sudo sysctl -w net.ipv4.tcp_low_latency=1 || true
+          $ErrorActionPreference = 'Stop'
+          $password = 'lt4c@2025'
+          net user 'yuu' 2>$null
+          if ($LASTEXITCODE -ne 0) {
+            net user 'yuu' $password /add
+          } else {
+            net user 'yuu' $password
+          }
+          net user 'yuu' /PASSWORDCHG:NO
+          wmic useraccount where "Name='yuu'" set PasswordExpires=FALSE | Out-Null
 
-      - name: Install graphics drivers and libraries
-        run: |
-          sudo apt-get update -qq
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
-            mesa-vulkan-drivers mesa-utils \
-            libgl1-mesa-dri libgl1-mesa-glx \
-            vulkan-tools vulkan-validationlayers \
-            libvulkan1 libvulkan-dev \
-            vainfo libva2 libva-drm2 libva-x11-2 \
-            libglu1-mesa libegl1-mesa \
-            xserver-xorg-video-all
-          
-          sudo apt-get clean
-          sudo rm -rf /var/lib/apt/lists/*
-
-      - name: Install desktop environment (minimal for gaming)
-        run: |
-          sudo apt-get update -qq
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
-            lxde-core xrdp openbox pcmanfm lxterminal \
-            pulseaudio pavucontrol alsa-utils \
-            xfonts-base fonts-liberation \
-            x11-xserver-utils dbus-x11
-          
-          sudo apt-get clean
-          sudo rm -rf /var/lib/apt/lists/*
-
-      - name: Install gaming platforms and tools
-        run: |
-          sudo apt-get update -qq
-          
-          # Steam
-          sudo dpkg --add-architecture i386
-          sudo apt-get update -qq
-          wget -q -O steam.deb "http://media.steampowered.com/client/installer/steam.deb"
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ./steam.deb || true
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -f -y -qq
-          rm -f steam.deb
-          
-          # Wine for Windows games
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --install-recommends \
-            wine64 wine32 winetricks \
-            libwine libwine:i386
-          
-          # Lutris game manager
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
-            lutris python3-pil python3-yaml
-          
-          # GameMode for performance boost
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
-            gamemode libgamemode0 libgamemodeauto0
-          
-          # MangoHud for FPS overlay
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
-            mangohud goverlay
-          
-          # Controller/gamepad support
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
-            joystick jstest-gtk xboxdrv
-          
-          # Additional gaming tools
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
-            git curl wget unzip build-essential \
-            python3 python3-pip cmake ninja-build \
-            ccache kitty
-          
-          sudo apt-get clean
-          sudo rm -rf /var/lib/apt/lists/*
-
-      - name: Install browsers
-        run: |
-          # Brave browser
-          sudo curl -fsSLo /usr/share/keyrings/brave-browser-archive-keyring.gpg https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg
-          echo "deb [signed-by=/usr/share/keyrings/brave-browser-archive-keyring.gpg] https://brave-browser-apt-release.s3.brave.com/ stable main" \
-            | sudo tee /etc/apt/sources.list.d/brave-browser-release.list >/dev/null
-          sudo apt-get update -qq
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq brave-browser
-          
-          # Discord
-          wget -q -O discord.deb "https://discord.com/api/download?platform=linux&format=deb"
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ./discord.deb || sudo apt-get install -f -y -qq
-          rm -f discord.deb
-          
-          sudo apt-get clean
-          sudo rm -rf /var/lib/apt/lists/*
-
-      - name: Fix GUI apps (Discord, Brave) - Disable GPU
-        run: |
-          # Increase shared memory for GUI apps
-          sudo mount -o remount,size=2G /dev/shm || true
-          
-          # Create launcher scripts with GPU disabled
-          sudo mkdir -p /usr/local/bin
-          
-          # Discord launcher without GPU
-          sudo bash -c 'cat > /usr/local/bin/discord-fixed' << 'EOF'
-          #!/bin/bash
-          /usr/share/discord/Discord \
-            --disable-gpu \
-            --disable-software-rasterizer \
-            --disable-dev-shm-usage \
-            --no-sandbox \
-            --disable-gpu-compositing \
-            --disable-accelerated-2d-canvas \
-            "$@"
-          EOF
-          sudo chmod +x /usr/local/bin/discord-fixed
-          
-          # Brave launcher without GPU
-          sudo bash -c 'cat > /usr/local/bin/brave-fixed' << 'EOF'
-          #!/bin/bash
-          /usr/bin/brave-browser \
-            --disable-gpu \
-            --disable-software-rasterizer \
-            --disable-dev-shm-usage \
-            --no-sandbox \
-            --disable-gpu-compositing \
-            --disable-accelerated-2d-canvas \
-            "$@"
-          EOF
-          sudo chmod +x /usr/local/bin/brave-fixed
-          
-          # Update Discord desktop entry
-          sudo mkdir -p /home/yuu/.local/share/applications
-          sudo cp /usr/share/applications/discord.desktop /home/yuu/.local/share/applications/
-          sudo sed -i 's|Exec=/usr/share/discord/Discord|Exec=/usr/local/bin/discord-fixed|g' /home/yuu/.local/share/applications/discord.desktop
-          
-          # Update Brave desktop entry
-          sudo cp /usr/share/applications/brave-browser.desktop /home/yuu/.local/share/applications/
-          sudo sed -i 's|Exec=brave-browser-stable|Exec=/usr/local/bin/brave-fixed|g' /home/yuu/.local/share/applications/brave-browser.desktop
-          sudo sed -i 's|Exec=/usr/bin/brave-browser|Exec=/usr/local/bin/brave-fixed|g' /home/yuu/.local/share/applications/brave-browser.desktop
-          
-          sudo chown -R yuu:yuu /home/yuu/.local
-          
-          echo "✓ Discord and Brave configured to run without GPU acceleration"
-          echo "✓ Shared memory increased to 2GB"
-
-      - name: Configure GameMode
-        run: |
-          sudo mkdir -p /etc/gamemode
-          sudo bash -c 'cat > /etc/gamemode/gamemode.ini' << 'EOF'
-          [general]
-          renice=10
-          ioprio=0
-          inhibit_screensaver=1
-          
-          [gpu]
-          apply_gpu_optimisations=accept-responsibility
-          gpu_device=0
-          amd_performance_level=high
-          
-          [custom]
-          start=notify-send "GameMode started"
-          end=notify-send "GameMode ended"
-          EOF
-          
-          sudo systemctl enable gamemoded 2>/dev/null || true
-          sudo systemctl start gamemoded 2>/dev/null || true
-
-      - name: Configure MangoHud
-        run: |
-          sudo mkdir -p /home/yuu/.config/MangoHud
-          sudo bash -c 'cat > /home/yuu/.config/MangoHud/MangoHud.conf' << 'EOF'
-          fps
-          frametime
-          cpu_temp
-          gpu_temp
-          ram
-          vram
-          position=top-left
-          font_size=24
-          background_alpha=0.5
-          EOF
-          sudo chown -R yuu:yuu /home/yuu/.config/MangoHud
-
-      - name: Optimize RDP for gaming
-        run: |
-          # Configure xRDP for low latency gaming
-          sudo bash -c 'cat > /etc/xrdp/xrdp.ini' << 'EOF'
-          [Globals]
-          ini_version=1
-          fork=true
-          port=3389
-          tcp_nodelay=true
-          tcp_keepalive=true
-          security_layer=negotiate
-          crypt_level=high
-          
-          ; Gaming optimizations
-          max_bpp=32
-          xserverbpp=32
-          use_fastpath=both
-          autorun=
-          
-          ; Disable compression for lower latency
-          bitmap_compression=false
-          bulk_compression=false
-          
-          ; Sound/input priority
-          channel.rdpsnd=true
-          channel.rdpdr=true
-          channel.drdynvc=true
-          channel.cliprdr=true
-          
-          [xrdp1]
-          name=sesman-Xvnc
-          lib=libvnc.so
-          username=ask
-          password=ask
-          ip=127.0.0.1
-          port=-1
-          EOF
-          
-          # Configure sesman
-          sudo bash -c 'cat > /etc/xrdp/sesman.ini' << 'EOF'
-          [Globals]
-          ListenPort=3350
-          EnableUserWindowManager=true
-          UserWindowManager=startlxde
-          DefaultWindowManager=startlxde
-          
-          [Security]
-          AllowRootLogin=false
-          MaxLoginRetry=3
-          
-          [Sessions]
-          X11DisplayOffset=10
-          MaxSessions=10
-          KillDisconnected=false
-          DisconnectedTimeLimit=0
-          Policy=Default
-          EOF
-
-      - name: Configure desktop for gaming
-        run: |
-          # Disable compositor and effects
-          sudo mkdir -p /home/yuu/.config/openbox
-          sudo bash -c 'cat > /home/yuu/.config/openbox/lxde-rc.xml' << 'EOF'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <openbox_config xmlns="http://openbox.org/3.4/rc">
-            <theme>
-              <name>Clearlooks</name>
-              <animateIconify>no</animateIconify>
-            </theme>
-            <desktops>
-              <number>1</number>
-            </desktops>
-            <resistance>
-              <strength>0</strength>
-              <screen_edge_strength>0</screen_edge_strength>
-            </resistance>
-          </openbox_config>
-          EOF
-          
-          # LXDE autostart for gaming
-          sudo mkdir -p /home/yuu/.config/lxsession/LXDE
-          sudo bash -c 'cat > /home/yuu/.config/lxsession/LXDE/autostart' << 'EOF'
-          @lxpanel --profile LXDE
-          @pcmanfm --desktop --profile LXDE
-          @/usr/bin/pulseaudio --start
-          EOF
-          
-          # PulseAudio low latency config
-          sudo mkdir -p /home/yuu/.config/pulse
-          sudo bash -c 'cat > /home/yuu/.config/pulse/daemon.conf' << 'EOF'
-          default-sample-rate = 48000
-          alternate-sample-rate = 44100
-          default-fragments = 2
-          default-fragment-size-msec = 5
-          high-priority = yes
-          nice-level = -11
-          realtime-scheduling = yes
-          realtime-priority = 9
-          resample-method = speex-float-1
-          EOF
-          
-          echo "startlxde" | sudo tee /home/yuu/.xsession
-          sudo chown -R yuu:yuu /home/yuu/.config
-          sudo chown yuu:yuu /home/yuu/.xsession
-
-      - name: Set custom wallpaper
-        env:
-          WALLPAPER_URL: ${{ secrets.WALLPAPER_URL }}
-        run: |
-          if [ -n "$WALLPAPER_URL" ]; then
-            echo "Downloading gaming wallpaper..."
-            sudo mkdir -p /usr/share/backgrounds
-            sudo wget -q -O /usr/share/backgrounds/gaming-wallpaper.jpg "$WALLPAPER_URL" || \
-            sudo wget -q -O /usr/share/backgrounds/gaming-wallpaper.png "$WALLPAPER_URL" || \
-            echo "Failed to download wallpaper, using default"
-            
-            WALLPAPER_FILE=$(ls /usr/share/backgrounds/gaming-wallpaper.* 2>/dev/null | head -1)
-            if [ -f "$WALLPAPER_FILE" ]; then
-              sudo mkdir -p /home/yuu/.config/pcmanfm/LXDE
-              sudo bash -c "cat > /home/yuu/.config/pcmanfm/LXDE/desktop-items-0.conf" << EOF
-          [*]
-          wallpaper_mode=stretch
-          wallpaper_common=1
-          wallpaper=$WALLPAPER_FILE
-          desktop_bg=#000000
-          desktop_fg=#ffffff
-          desktop_shadow=#000000
-          show_wm_menu=0
-          EOF
-              sudo chown -R yuu:yuu /home/yuu/.config/pcmanfm
-              echo "Gaming wallpaper set successfully!"
-            fi
-          else
-            echo "No wallpaper URL provided"
-          fi
-
-      - name: Setup Tailscale
+      - name: Install and authenticate Tailscale
+        shell: pwsh
         env:
           TAILSCALE_AUTH_KEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
         run: |
-          curl -fsSL https://tailscale.com/install.sh | sh
-          sudo tailscale up --authkey=${TAILSCALE_AUTH_KEY} --hostname=gaming-${{ github.run_id }}
-          TS_IP=$(tailscale ip -4)
-          echo "TS_IP=$TS_IP" >> $GITHUB_ENV
+          $ErrorActionPreference = 'Stop'
+          if (-not $env:TAILSCALE_AUTH_KEY) {
+            throw 'TAILSCALE_AUTH_KEY secret is not available.'
+          }
 
-      - name: Start RDP service
-        run: |
-          sudo systemctl enable xrdp
-          sudo systemctl start xrdp
-          sudo systemctl status xrdp --no-pager || true
+          $tailscaleInstaller = Join-Path $env:TEMP 'tailscale.msi'
+          Invoke-WebRequest -Uri 'https://pkgs.tailscale.com/stable/tailscale-setup-latest-amd64.msi' -OutFile $tailscaleInstaller
+          Start-Process -FilePath msiexec.exe -ArgumentList "/i `"$tailscaleInstaller`" /qn /norestart" -Wait
 
-      - name: Verify gaming setup
-        run: |
-          echo "=== Verifying Gaming Environment ==="
-          echo "Graphics:"
-          glxinfo | grep "OpenGL renderer" || echo "GLX not available"
-          vulkaninfo --summary 2>/dev/null | grep "GPU" || echo "Vulkan info not available"
-          
-          echo -e "\nGaming Tools:"
-          which steam && echo "✓ Steam installed" || echo "✗ Steam missing"
-          which wine && echo "✓ Wine installed" || echo "✗ Wine missing"
-          which lutris && echo "✓ Lutris installed" || echo "✗ Lutris missing"
-          which gamemoded && echo "✓ GameMode installed" || echo "✗ GameMode missing"
-          which mangohud && echo "✓ MangoHud installed" || echo "✗ MangoHud missing"
+          $tailscaleExe = Join-Path $env:ProgramFiles 'Tailscale IPN\tailscale.exe'
+          if (-not (Test-Path $tailscaleExe)) {
+            $tailscaleExe = 'C:\Program Files\Tailscale\tailscale.exe'
+          }
 
-      - name: Keep alive - Gaming Session
+          Start-Service -Name 'Tailscale' -ErrorAction SilentlyContinue
+          & $tailscaleExe up --authkey $env:TAILSCALE_AUTH_KEY --hostname ("gha-" + $env:RUNNER_NAME) --accept-dns=false --reset | Out-Null
+
+          $tailscaleIp = (& $tailscaleExe ip -4)[0]
+          if (-not $tailscaleIp) {
+            throw 'Unable to determine Tailscale IPv4 address.'
+          }
+
+          "TAILSCALE_IP=$tailscaleIp" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Emit connection details
+        shell: pwsh
         run: |
-          echo "╔════════════════════════════════════════════╗"
-          echo "║   🎮 GAMING SESSION ACTIVE 🎮             ║"
-          echo "╠════════════════════════════════════════════╣"
-          echo "║ Tailscale IP: $TS_IP"
-          echo "║ RDP Port:     3389"
-          echo "║ Username:     $CI_USER"
-          echo "║ Password:     $CI_PASS"
-          echo "╠════════════════════════════════════════════╣"
-          echo "║ Gaming Tools Installed:                   ║"
-          echo "║ • Steam (Linux & Windows games)           ║"
-          echo "║ • Wine/Proton (Windows compatibility)     ║"
-          echo "║ • Lutris (Game manager)                   ║"
-          echo "║ • GameMode (Performance boost)            ║"
-          echo "║ • MangoHud (FPS overlay - F12)            ║"
-          echo "║ • Discord & Brave Browser                 ║"
-          echo "╠════════════════════════════════════════════╣"
-          echo "║ Performance Optimizations:                ║"
-          echo "║ ✓ CPU Performance Mode                    ║"
-          echo "║ ✓ Low Latency RDP (32-bit color)         ║"
-          echo "║ ✓ PulseAudio Low Latency                  ║"
-          echo "║ ✓ Vulkan & OpenGL Drivers                 ║"
-          echo "║ ✓ Network Optimized                       ║"
-          echo "╠════════════════════════════════════════════╣"
-          echo "║ Tips:                                      ║"
-          echo "║ • Run games with: gamemoderun <game>      ║"
-          echo "║ • FPS overlay: mangohud <game>            ║"
-          echo "║ • Combined: gamemoderun mangohud <game>   ║"
-          echo "╚════════════════════════════════════════════╝"
-          
-          while true; do sleep 300; done
+          Write-Host "::notice::Tailscale IPv4 Address: $env:TAILSCALE_IP"
+          Write-Host '::notice::Username: yuu'
+          Write-Host '::notice::Password: lt4c@2025'
