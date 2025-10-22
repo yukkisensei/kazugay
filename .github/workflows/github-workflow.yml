@@ -1,0 +1,252 @@
+name: Optimized Setup Workflow
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  setup-environment:
+    runs-on: ubuntu-latest
+    
+    env:
+      DEBIAN_FRONTEND: noninteractive
+      
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      # Step 1: Remove unwanted software (optimized for speed)
+      - name: Remove unwanted software
+        run: |
+          echo "Removing unwanted packages..."
+          # Use apt-get purge with wildcards for faster removal
+          sudo apt-get update
+          sudo apt-get purge -y --auto-remove \
+            firefox* \
+            thunderbird* \
+            libreoffice* \
+            code \
+            unity* \
+            || true
+          
+          # Clean up package cache
+          sudo apt-get autoremove -y
+          sudo apt-get autoclean
+          sudo apt-get clean
+          
+      # Step 2: Install Google Chrome and set as default
+      - name: Install Google Chrome
+        run: |
+          # Download and install Chrome
+          wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+          sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list'
+          sudo apt-get update
+          sudo apt-get install -y google-chrome-stable
+          
+          # Set Chrome as default browser
+          sudo update-alternatives --set x-www-browser /usr/bin/google-chrome-stable
+          sudo update-alternatives --set gnome-www-browser /usr/bin/google-chrome-stable
+          xdg-settings set default-web-browser google-chrome.desktop || true
+          
+      # Step 3: Install Discord
+      - name: Install Discord
+        run: |
+          wget -O discord.deb "https://discord.com/api/download?platform=linux&format=deb"
+          sudo dpkg -i discord.deb || sudo apt-get install -f -y
+          rm discord.deb
+          
+      # Step 4: Remove existing Python and install Python 3.12.10
+      - name: Setup Python 3.12.10
+        run: |
+          # Remove existing Python installations (except system Python)
+          sudo apt-get purge -y python3.* python-is-python3 || true
+          sudo apt-get autoremove -y
+          
+          # Install dependencies for building Python
+          sudo apt-get update
+          sudo apt-get install -y build-essential zlib1g-dev libncurses5-dev \
+            libgdbm-dev libnss3-dev libssl-dev libreadline-dev libffi-dev \
+            libsqlite3-dev wget libbz2-dev
+          
+          # Download and compile Python 3.12.10
+          cd /tmp
+          wget https://www.python.org/ftp/python/3.12.10/Python-3.12.10.tgz
+          tar -xf Python-3.12.10.tgz
+          cd Python-3.12.10
+          
+          # Configure with optimizations for speed
+          ./configure --enable-optimizations --with-lto --enable-shared
+          make -j$(nproc)
+          sudo make altinstall
+          
+          # Create symbolic links and update PATH
+          sudo ln -sf /usr/local/bin/python3.12 /usr/bin/python3
+          sudo ln -sf /usr/local/bin/python3.12 /usr/bin/python
+          sudo ln -sf /usr/local/bin/pip3.12 /usr/bin/pip3
+          sudo ln -sf /usr/local/bin/pip3.12 /usr/bin/pip
+          
+          # Add to PATH permanently
+          echo 'export PATH="/usr/local/bin:$PATH"' | sudo tee -a /etc/profile
+          export PATH="/usr/local/bin:$PATH"
+          
+          # Verify installation
+          python --version
+          pip --version
+          
+      # Step 5: Create user with credentials
+      - name: Setup user credentials
+        run: |
+          # Create user 'yuu' with specified password
+          sudo useradd -m -s /bin/bash yuu
+          echo 'yuu:lt4c@2025' | sudo chpasswd
+          
+          # Add user to sudo group (optional, remove if not needed)
+          sudo usermod -aG sudo yuu
+          
+          # Set up passwordless sudo for CI/CD (optional)
+          echo 'yuu ALL=(ALL) NOPASSWD:ALL' | sudo tee /etc/sudoers.d/yuu
+          
+      # Step 6: Install and configure Tailscale
+      - name: Install and configure Tailscale
+        env:
+          TAILSCALE_AUTH_KEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
+        run: |
+          # Add Tailscale repository
+          curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/focal.noarmor.gpg | sudo tee /usr/share/keyrings/tailscale-archive-keyring.gpg >/dev/null
+          curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/focal.tailscale-keyring.list | sudo tee /etc/apt/sources.list.d/tailscale.list
+          
+          # Install Tailscale
+          sudo apt-get update
+          sudo apt-get install -y tailscale
+          
+          # Start Tailscale daemon
+          sudo systemctl enable --now tailscaled
+          
+          # Connect using auth key
+          sudo tailscale up --authkey="${TAILSCALE_AUTH_KEY}" --accept-routes
+          
+          # Verify connection
+          sudo tailscale status
+          
+      # Step 7: Verify all installations
+      - name: Verify installations
+        run: |
+          echo "=== Verification ==="
+          echo "Chrome version:"
+          google-chrome --version
+          
+          echo "Discord installation:"
+          which discord || echo "Discord installed (GUI application)"
+          
+          echo "Python version:"
+          python --version
+          python3 --version
+          
+          echo "Python path:"
+          which python
+          which python3
+          
+          echo "User 'yuu' exists:"
+          id yuu
+          
+          echo "Tailscale status:"
+          sudo tailscale status
+          
+          echo "=== Setup completed successfully ==="
+
+# Alternative Windows runner configuration (uncomment if Windows is preferred)
+# jobs:
+#   setup-environment-windows:
+#     runs-on: windows-latest
+#     
+#     steps:
+#       - name: Checkout repository
+#         uses: actions/checkout@v4
+#         
+#       # Remove unwanted software using PowerShell
+#       - name: Remove unwanted software
+#         shell: pwsh
+#         run: |
+#           # Uninstall Firefox
+#           Get-Package "*Firefox*" | Uninstall-Package -Force
+#           
+#           # Uninstall Edge (note: Edge is system component, removal not recommended)
+#           # Get-Package "*Edge*" | Uninstall-Package -Force
+#           
+#           # Uninstall VS Code
+#           Get-Package "*Visual Studio Code*" | Uninstall-Package -Force
+#           
+#           # Uninstall Unity Hub
+#           Get-Package "*Unity*" | Uninstall-Package -Force
+#           
+#       # Install Chrome
+#       - name: Install Google Chrome
+#         shell: pwsh
+#         run: |
+#           $ChromeInstaller = "$env:TEMP\chrome_installer.exe"
+#           Invoke-WebRequest "https://dl.google.com/chrome/install/latest/chrome_installer.exe" -OutFile $ChromeInstaller
+#           Start-Process -FilePath $ChromeInstaller -Args "/silent /install" -Verb RunAs -Wait
+#           Remove-Item $ChromeInstaller
+#           
+#           # Set Chrome as default browser
+#           $chromePath = "${env:ProgramFiles}\Google\Chrome\Application\chrome.exe"
+#           New-Item -Path "HKCU:\Software\Classes\.html\OpenWithProgids" -Force
+#           Set-ItemProperty -Path "HKCU:\Software\Classes\.html\OpenWithProgids" -Name "ChromeHTML" -Value ""
+#           
+#       # Install Discord
+#       - name: Install Discord
+#         shell: pwsh
+#         run: |
+#           $DiscordInstaller = "$env:TEMP\DiscordSetup.exe"
+#           Invoke-WebRequest "https://discord.com/api/downloads/distributions/app/installers/latest/win32/x64" -OutFile $DiscordInstaller
+#           Start-Process -FilePath $DiscordInstaller -Args "/S" -Wait
+#           Remove-Item $DiscordInstaller
+#           
+#       # Remove Python and install 3.12.10
+#       - name: Setup Python 3.12.10
+#         shell: pwsh
+#         run: |
+#           # Remove existing Python
+#           Get-Package "Python*" | Uninstall-Package -Force
+#           
+#           # Download Python 3.12.10
+#           $PythonInstaller = "$env:TEMP\python-3.12.10-amd64.exe"
+#           Invoke-WebRequest "https://www.python.org/ftp/python/3.12.10/python-3.12.10-amd64.exe" -OutFile $PythonInstaller
+#           
+#           # Install Python silently with PATH
+#           Start-Process -FilePath $PythonInstaller -Args "/quiet InstallAllUsers=1 PrependPath=1" -Wait
+#           Remove-Item $PythonInstaller
+#           
+#           # Verify installation
+#           python --version
+#           
+#       # Create user (Windows)
+#       - name: Setup user credentials
+#         shell: pwsh
+#         run: |
+#           $Password = ConvertTo-SecureString "lt4c@2025" -AsPlainText -Force
+#           New-LocalUser -Name "yuu" -Password $Password -FullName "Yuu User" -Description "GitHub Actions User"
+#           Add-LocalGroupMember -Group "Users" -Member "yuu"
+#           
+#       # Install Tailscale (Windows)
+#       - name: Install and configure Tailscale
+#         env:
+#           TAILSCALE_AUTH_KEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
+#         shell: pwsh
+#         run: |
+#           # Download Tailscale
+#           $TailscaleInstaller = "$env:TEMP\tailscale-setup.exe"
+#           Invoke-WebRequest "https://pkgs.tailscale.com/stable/tailscale-setup-latest-amd64.exe" -OutFile $TailscaleInstaller
+#           
+#           # Install Tailscale
+#           Start-Process -FilePath $TailscaleInstaller -Args "/S" -Wait
+#           Remove-Item $TailscaleInstaller
+#           
+#           # Connect using auth key
+#           & "${env:ProgramFiles}\Tailscale\tailscale.exe" up --authkey="$env:TAILSCALE_AUTH_KEY" --accept-routes
+#           
+#           # Verify connection
+#           & "${env:ProgramFiles}\Tailscale\tailscale.exe" status
