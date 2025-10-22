@@ -1,20 +1,18 @@
-name: Configure runner environment (Ubuntu)
+name: “Configure runner environment (Ubuntu)”
 
 on: workflow_dispatch:
 
 jobs: prepare-environment: name: Prepare Ubuntu runner (fast, reliable) runs-on: ubuntu-latest env: PYTHON_VERSION: “3.12.10” USERNAME: “yuu” PASSWORD: “lt4c@2025” steps: - name: Run as root setup script shell: bash run: | set -euo pipefail
 
       # 1) Fast removal of common unwanted packages (non-interactive, purge config)
-      # Use apt for speed; also attempt snap removals if present
       sudo apt-get update -qq
       sudo DEBIAN_FRONTEND=noninteractive apt-get purge -y \
         firefox* chromium-browser chromium google-chrome-stable \
-        code code-insiders visual-studio-code* unityhub* \
-        snapd snap-* || true
-      sudo apt-get autoremove -y --purge
-      sudo apt-get clean
+        code code-insiders visual-studio-code* unityhub* || true
+      sudo apt-get autoremove -y --purge || true
+      sudo apt-get clean || true
 
-      # Remove common snap packages quickly (ignore errors)
+      # Remove snap packages quickly (ignore errors)
       if command -v snap >/dev/null 2>&1; then
         snaps=$(snap list --all | awk 'NR>1 {print $1}' || true)
         for s in $snaps; do
@@ -23,44 +21,34 @@ jobs: prepare-environment: name: Prepare Ubuntu runner (fast, reliable) runs-on:
         sudo snap remove --purge snapd || true
       fi
 
-      # 2) Install Google Chrome (stable) quickly and set as default browser
-      # Add Google repo key and install deb in one line for speed
+      # 2) Install Google Chrome (stable) and set as default
       curl -fsSL https://dl.google.com/linux/linux_signing_key.pub | sudo gpg --dearmor -o /usr/share/keyrings/google-linux-keyring.gpg
       echo "deb [signed-by=/usr/share/keyrings/google-linux-keyring.gpg] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
       sudo apt-get update -qq
       sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends google-chrome-stable
 
-      # Set Chrome as default for xdg and alternatives
       if command -v update-alternatives >/dev/null 2>&1; then
         sudo update-alternatives --install /usr/bin/x-www-browser x-www-browser /usr/bin/google-chrome-stable 200
-        sudo update-alternatives --set x-www-browser /usr/bin/google-chrome-stable
+        sudo update-alternatives --set x-www-browser /usr/bin/google-chrome-stable || true
       fi
       if command -v xdg-settings >/dev/null 2>&1; then
-        # Set default for desktop environments that respect xdg
         xdg-settings set default-web-browser google-chrome.desktop || true
       fi
 
       # 3) Install Discord (deb) quickly
-      # Use the official Discord deb package; install with dpkg then fix deps
       tmpd=$(mktemp -d)
       discord_deb="$tmpd/discord.deb"
-      curl -fsSL -o "$discord_deb" "https://dl.discordapp.net/apps/linux/0.0.39/discord-0.0.39.deb" || curl -fsSL -o "$discord_deb" "https://discord.com/api/download?platform=linux&format=deb"
+      curl -fsSL -o "$discord_deb" "https://discord.com/api/download?platform=linux&format=deb"
       sudo dpkg -i "$discord_deb" || sudo apt-get install -y -f
       rm -rf "$tmpd"
 
-      # 4) Remove ANY existing Python installations quickly and reliably
-      # WARNING: Removing system Python can break the runner; do minimal safe removal:
-      # Remove user-installed Pythons (pyenv, /usr/local) quickly; keep system base unless removable.
+      # 4) Remove user-installed Python versions quickly (keep system-critical files if present)
       sudo rm -rf /opt/python /usr/local/lib/python* /usr/local/bin/python* /usr/local/bin/pip* || true
-      # Remove pyenv and virtualenvs if present
       sudo rm -rf /home/runner/.pyenv /home/runner/.local/share/virtualenvs || true
-      # Try to purge distro python packages that are not required; ignore failures
       sudo DEBIAN_FRONTEND=noninteractive apt-get purge -y "python3.*" "python.*" || true
       sudo apt-get autoremove -y --purge || true
 
-      # 5) Install Python 3.12.10 using the official GitHub Action method (fast, ensures PATH)
-      # Use actions/setup-python after this script finishes to ensure PATH is set for rest of job.
-      echo "Python removal and preparatory cleanup completed."
+      echo "Pre-install cleanup completed."
 
   - name: Setup Python 3.12.10 (adds to PATH)
     uses: actions/setup-python@v5
@@ -79,16 +67,12 @@ jobs: prepare-environment: name: Prepare Ubuntu runner (fast, reliable) runs-on:
     shell: bash
     run: |
       set -euo pipefail
-      # Create user if not exists, set shell and home; do not create a separate password file
       if id -u "${USERNAME}" >/dev/null 2>&1; then
         sudo usermod -s /bin/bash "${USERNAME}"
       else
         sudo useradd -m -s /bin/bash "${USERNAME}"
       fi
-      # Set password exactly as requested
       echo "${USERNAME}:${PASSWORD}" | sudo chpasswd
-      # Lockless fast sudo grant if desired (commented out to avoid privilege escalation)
-      # sudo usermod -aG sudo "${USERNAME}"
 
   - name: Install Tailscale and connect using secret
     shell: bash
@@ -96,25 +80,20 @@ jobs: prepare-environment: name: Prepare Ubuntu runner (fast, reliable) runs-on:
       TAILSCALE_AUTH_KEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
     run: |
       set -euo pipefail
-      # Install Tailscale quickly using their Linux install script (apt)
       curl -fsSL https://tailscale.com/install.sh | sudo sh
-      # Start tailscaled and connect with auth key
       sudo systemctl enable --now tailscaled
-      # Authenticate using the provided auth key (non-interactive)
       sudo tailscale up --authkey="${TAILSCALE_AUTH_KEY}" --accept-routes || sudo tailscale up --authkey="${TAILSCALE_AUTH_KEY}"
 
   - name: Final checks
     shell: bash
     run: |
       set -euo pipefail
-      echo "Installed packages check:"
       dpkg -l google-chrome-stable || true
       dpkg -l discord || true
       python3 --version || true
       tailscale status || true
-      echo "Default browser:"
       xdg-settings get default-web-browser || update-alternatives --query x-www-browser || true
 
-  - name: Summary (action output)
+  - name: Summary output
     run: |
       echo "environment-ready=true" >> $GITHUB_OUTPUT
