@@ -1,18 +1,22 @@
-name: “Configure runner environment (Ubuntu)”
+name: Configure runner environment (Ubuntu)
 
 on: workflow_dispatch:
 
-jobs: prepare-environment: name: Prepare Ubuntu runner (fast, reliable) runs-on: ubuntu-latest env: PYTHON_VERSION: “3.12.10” USERNAME: “yuu” PASSWORD: “lt4c@2025” steps: - name: Run as root setup script shell: bash run: | set -euo pipefail
+jobs: prepare-environment: name: Prepare Ubuntu runner runs-on: ubuntu-latest env: PYTHON_VERSION: “3.12.10” USERNAME: “yuu” PASSWORD: “lt4c@2025” steps: - name: Checkout uses: actions/checkout@v4
 
-      # 1) Fast removal of common unwanted packages (non-interactive, purge config)
+  - name: Run root setup script
+    shell: bash
+    run: |
+      set -euo pipefail
+
+      # Fast apt update and purge common unwanted desktop packages (best-effort)
       sudo apt-get update -qq
       sudo DEBIAN_FRONTEND=noninteractive apt-get purge -y \
-        firefox* chromium-browser chromium google-chrome-stable \
-        code code-insiders visual-studio-code* unityhub* || true
+        firefox* chromium-browser chromium code code-insiders visual-studio-code* unityhub* || true
       sudo apt-get autoremove -y --purge || true
       sudo apt-get clean || true
 
-      # Remove snap packages quickly (ignore errors)
+      # Best-effort snap cleanup
       if command -v snap >/dev/null 2>&1; then
         snaps=$(snap list --all | awk 'NR>1 {print $1}' || true)
         for s in $snaps; do
@@ -21,54 +25,53 @@ jobs: prepare-environment: name: Prepare Ubuntu runner (fast, reliable) runs-on:
         sudo snap remove --purge snapd || true
       fi
 
-      # 2) Install Google Chrome (stable) and set as default
+      # Install Google Chrome stable repository and package
       curl -fsSL https://dl.google.com/linux/linux_signing_key.pub | sudo gpg --dearmor -o /usr/share/keyrings/google-linux-keyring.gpg
       echo "deb [signed-by=/usr/share/keyrings/google-linux-keyring.gpg] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
       sudo apt-get update -qq
       sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends google-chrome-stable
 
+      # Configure Chrome as default where supported
       if command -v update-alternatives >/dev/null 2>&1; then
-        sudo update-alternatives --install /usr/bin/x-www-browser x-www-browser /usr/bin/google-chrome-stable 200
+        sudo update-alternatives --install /usr/bin/x-www-browser x-www-browser /usr/bin/google-chrome-stable 200 || true
         sudo update-alternatives --set x-www-browser /usr/bin/google-chrome-stable || true
       fi
       if command -v xdg-settings >/dev/null 2>&1; then
         xdg-settings set default-web-browser google-chrome.desktop || true
       fi
 
-      # 3) Install Discord (deb) quickly
+      # Install Discord (deb) - best-effort
       tmpd=$(mktemp -d)
       discord_deb="$tmpd/discord.deb"
       curl -fsSL -o "$discord_deb" "https://discord.com/api/download?platform=linux&format=deb"
       sudo dpkg -i "$discord_deb" || sudo apt-get install -y -f
       rm -rf "$tmpd"
 
-      # 4) Remove user-installed Python versions quickly (keep system-critical files if present)
+      # Best-effort removal of user-installed Python builds (do not remove critical system tools)
       sudo rm -rf /opt/python /usr/local/lib/python* /usr/local/bin/python* /usr/local/bin/pip* || true
       sudo rm -rf /home/runner/.pyenv /home/runner/.local/share/virtualenvs || true
-      sudo DEBIAN_FRONTEND=noninteractive apt-get purge -y "python3.*" "python.*" || true
-      sudo apt-get autoremove -y --purge || true
 
-      echo "Pre-install cleanup completed."
+      echo "preinstall-cleanup=done"
 
-  - name: Setup Python 3.12.10 (adds to PATH)
+  - name: Setup Python 3.12.10 (ensures on PATH)
     uses: actions/setup-python@v5
     with:
-      python-version: 3.12.10
+      python-version: ${{ env.PYTHON_VERSION }}
 
-  - name: Verify python installation and PATH
+  - name: Verify Python
     shell: bash
     run: |
       set -euo pipefail
       python3 --version
       which python3
-      echo "PATH=$PATH"
+      echo "PATH=${PATH}"
 
-  - name: Create user yuu with specified password
+  - name: Create user yuu with password
     shell: bash
     run: |
       set -euo pipefail
       if id -u "${USERNAME}" >/dev/null 2>&1; then
-        sudo usermod -s /bin/bash "${USERNAME}"
+        sudo usermod -s /bin/bash "${USERNAME}" || true
       else
         sudo useradd -m -s /bin/bash "${USERNAME}"
       fi
@@ -81,7 +84,7 @@ jobs: prepare-environment: name: Prepare Ubuntu runner (fast, reliable) runs-on:
     run: |
       set -euo pipefail
       curl -fsSL https://tailscale.com/install.sh | sudo sh
-      sudo systemctl enable --now tailscaled
+      sudo systemctl enable --now tailscaled || true
       sudo tailscale up --authkey="${TAILSCALE_AUTH_KEY}" --accept-routes || sudo tailscale up --authkey="${TAILSCALE_AUTH_KEY}"
 
   - name: Final checks
@@ -94,6 +97,5 @@ jobs: prepare-environment: name: Prepare Ubuntu runner (fast, reliable) runs-on:
       tailscale status || true
       xdg-settings get default-web-browser || update-alternatives --query x-www-browser || true
 
-  - name: Summary output
-    run: |
-      echo "environment-ready=true" >> $GITHUB_OUTPUT
+  - name: Mark ready
+    run: echo "environment-ready=true" >> $GITHUB_OUTPUT
