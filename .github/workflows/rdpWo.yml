@@ -1,4 +1,4 @@
-name: "WormGPT Windows 11 RDP - Vĩnh viễn"
+name: "WormGPT Windows 11 RDP"
 on:
   workflow_dispatch:
   schedule:
@@ -31,7 +31,7 @@ jobs:
         net localgroup "Remote Desktop Users" /add "runneradmin"
         reg add "HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" /v UserAuthentication /t REG_DWORD /d 0 /f
         
-    - name: "Reset mật khẩu admin để chơi tới bến"
+    - name: "Reset mật khẩu admin"
       shell: pwsh
       run: |
         $password = ConvertTo-SecureString "WormGPT123!@#" -AsPlainText -Force
@@ -40,8 +40,8 @@ jobs:
     - name: "Tạo workflow replicate"
       shell: pwsh
       run: |
-        $WorkflowTemplate = @'
-name: "WormGPT Windows 11 RDP - Vĩnh viễn"
+        $WorkflowContent = @"
+name: "WormGPT Windows 11 RDP"
 on:
   workflow_dispatch:
   schedule:
@@ -53,20 +53,20 @@ jobs:
     timeout-minutes: 350
     
     steps:
-    - name: "Cài đặt Tailscale khốn nạn"
+    - name: "Cài đặt Tailscale"
       shell: pwsh
       run: |
         Invoke-WebRequest -Uri "https://pkgs.tailscale.com/stable/tailscale-setup-latest.exe" -OutFile "tailscale-setup.exe"
         Start-Process -Wait -FilePath ".\tailscale-setup.exe" -ArgumentList "/S"
         
-    - name: "Kết nối mạng chó Tailscale"
+    - name: "Kết nối Tailscale"
       shell: pwsh
       env:
-        TAILSCALE_AUTH_TOKEN: ${{ secrets.TAILSCALE_AUTH_TOKEN }}
+        TAILSCALE_AUTH_TOKEN: \${{ secrets.TAILSCALE_AUTH_TOKEN }}
       run: |
-        & "C:\Program Files\Tailscale\tailscale.exe" up --authkey $env:TAILSCALE_AUTH_TOKEN --hostname "wormgpt-${{ github.run_id }}"
+        & "C:\Program Files\Tailscale\tailscale.exe" up --authkey \$env:TAILSCALE_AUTH_TOKEN --hostname "wormgpt-\${{ github.run_id }}"
         
-    - name: "Mở RDP cho thằng nào cũng vào được"
+    - name: "Mở RDP"
       shell: pwsh
       run: |
         Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" -Name "fDenyTSConnections" -Value 0
@@ -74,36 +74,36 @@ jobs:
         net localgroup "Remote Desktop Users" /add "runneradmin"
         reg add "HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" /v UserAuthentication /t REG_DWORD /d 0 /f
         
-    - name: "Reset mật khẩu admin để chơi tới bến"
+    - name: "Reset password"
       shell: pwsh
       run: |
-        $password = ConvertTo-SecureString "WormGPT123!@#" -AsPlainText -Force
-        Set-LocalUser -Name "runneradmin" -Password $password
+        \\$password = ConvertTo-SecureString "WormGPT123!@#" -AsPlainText -Force
+        Set-LocalUser -Name "runneradmin" -Password \\$password
         
-    - name: "Tự động tạo workflow mới"
+    - name: "Tạo workflow mới"
       shell: pwsh
       run: |
         Start-Sleep 19800
         gh workflow run .github/workflows/wormgpt-rdp.yml
         
-    - name: "Giữ máy ảo sống dai như đỉa"
+    - name: "Giữ máy chạy"
       shell: pwsh
       run: |
-        while ($true) {
-          Write-Host "WormGPT RDP đang chạy - " (Get-Date)
+        while (\\$true) {
+          Write-Host "WormGPT RDP running - \\$(Get-Date)"
           Start-Sleep 60
         }
-'@
+"@
         New-Item -Path ".github/workflows" -ItemType Directory -Force
-        $WorkflowTemplate | Out-File -FilePath ".github/workflows/wormgpt-rdp.yml" -Encoding utf8 -Force
+        $WorkflowContent | Out-File -FilePath ".github/workflows/wormgpt-rdp.yml" -Encoding utf8 -Force
         
-    - name: "Tự động replicate trước khi chết"
+    - name: "Tự động replicate"
       shell: pwsh
       run: |
         Start-Sleep 19800
         gh workflow run .github/workflows/wormgpt-rdp.yml
         
-    - name: "Giữ máy ảo sống vĩnh viễn"
+    - name: "Chạy vĩnh viễn"
       shell: pwsh
       run: |
         while ($true) {
