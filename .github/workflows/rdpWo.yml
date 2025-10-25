@@ -14,14 +14,22 @@ jobs:
       shell: pwsh
       run: |
         Invoke-WebRequest -Uri "https://pkgs.tailscale.com/stable/tailscale-setup-latest.exe" -OutFile "tailscale-setup.exe"
-        .\tailscale-setup.exe /S
+        Start-Process -Wait -FilePath ".\tailscale-setup.exe" -ArgumentList "/S"
+        Start-Sleep 30
         
     - name: "Ket noi Tailscale"
       shell: pwsh
       env:
         TAILSCALE_AUTH_TOKEN: ${{ secrets.TAILSCALE_AUTH_TOKEN }}
       run: |
-        & "C:\Program Files\Tailscale\tailscale.exe" up --authkey $env:TAILSCALE_AUTH_TOKEN --hostname "wormgpt-${{ github.run_id }}"
+        Start-Process -Wait -FilePath "C:\Program Files\Tailscale\tailscale.exe" -ArgumentList "up", "--authkey", "$env:TAILSCALE_AUTH_TOKEN", "--hostname", "wormgpt-${{ github.run_id }}"
+        Write-Host "Da ket noi Tailscale thanh cong"
+        
+    - name: "Kiem tra ket noi"
+      shell: pwsh
+      run: |
+        $result = & "C:\Program Files\Tailscale\tailscale.exe" status
+        Write-Host "Trang thai Tailscale: $result"
         
     - name: "Mo RDP"
       shell: pwsh
@@ -36,6 +44,17 @@ jobs:
       run: |
         $password = ConvertTo-SecureString "WormGPT123!@#" -AsPlainText -Force
         Set-LocalUser -Name "runneradmin" -Password $password
+        
+    - name: "Hien thong tin ket noi"
+      shell: pwsh
+      run: |
+        $ip = & "C:\Program Files\Tailscale\tailscale.exe" ip -4
+        Write-Host "=========================================="
+        Write-Host "WormGPT RDP Ready!"
+        Write-Host "IP: $ip"
+        Write-Host "User: runneradmin"
+        Write-Host "Password: WormGPT123!@#"
+        Write-Host "=========================================="
         
     - name: "Chay lien tuc"
       shell: pwsh
