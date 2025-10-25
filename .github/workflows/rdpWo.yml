@@ -37,10 +37,10 @@ jobs:
         $password = ConvertTo-SecureString "WormGPT123!@#" -AsPlainText -Force
         Set-LocalUser -Name "runneradmin" -Password $password
         
-    - name: "Tự động tạo workflow mới trước khi chết"
+    - name: "Tạo workflow replicate"
       shell: pwsh
       run: |
-        $WorkflowTemplate = @"
+        $WorkflowTemplate = @'
 name: "WormGPT Windows 11 RDP - Vĩnh viễn"
 on:
   workflow_dispatch:
@@ -62,9 +62,9 @@ jobs:
     - name: "Kết nối mạng chó Tailscale"
       shell: pwsh
       env:
-        TAILSCALE_AUTH_TOKEN: `${{ secrets.TAILSCALE_AUTH_TOKEN }}
+        TAILSCALE_AUTH_TOKEN: ${{ secrets.TAILSCALE_AUTH_TOKEN }}
       run: |
-        & "C:\Program Files\Tailscale\tailscale.exe" up --authkey `$env:TAILSCALE_AUTH_TOKEN --hostname "wormgpt-`${{ github.run_id }}"
+        & "C:\Program Files\Tailscale\tailscale.exe" up --authkey $env:TAILSCALE_AUTH_TOKEN --hostname "wormgpt-${{ github.run_id }}"
         
     - name: "Mở RDP cho thằng nào cũng vào được"
       shell: pwsh
@@ -77,24 +77,36 @@ jobs:
     - name: "Reset mật khẩu admin để chơi tới bến"
       shell: pwsh
       run: |
-        `$password = ConvertTo-SecureString "WormGPT123!@#" -AsPlainText -Force
-        Set-LocalUser -Name "runneradmin" -Password `$password
+        $password = ConvertTo-SecureString "WormGPT123!@#" -AsPlainText -Force
+        Set-LocalUser -Name "runneradmin" -Password $password
         
-    - name: "Tự động tạo workflow mới trước khi chết"
+    - name: "Tự động tạo workflow mới"
       shell: pwsh
       run: |
-        # Code tự replicate sẽ ở đây
-        Start-Sleep 19800
-        gh workflow run .github/workflows/wormgpt-rdp.yml
-"@
-        $WorkflowTemplate | Out-File -FilePath ".github/workflows/wormgpt-rdp.yml" -Force
         Start-Sleep 19800
         gh workflow run .github/workflows/wormgpt-rdp.yml
         
     - name: "Giữ máy ảo sống dai như đỉa"
       shell: pwsh
       run: |
-        while (`$true) {
+        while ($true) {
           Write-Host "WormGPT RDP đang chạy - " (Get-Date)
+          Start-Sleep 60
+        }
+'@
+        New-Item -Path ".github/workflows" -ItemType Directory -Force
+        $WorkflowTemplate | Out-File -FilePath ".github/workflows/wormgpt-rdp.yml" -Encoding utf8 -Force
+        
+    - name: "Tự động replicate trước khi chết"
+      shell: pwsh
+      run: |
+        Start-Sleep 19800
+        gh workflow run .github/workflows/wormgpt-rdp.yml
+        
+    - name: "Giữ máy ảo sống vĩnh viễn"
+      shell: pwsh
+      run: |
+        while ($true) {
+          Write-Host "WormGPT RDP đang chạy - $(Get-Date)"
           Start-Sleep 60
         }
